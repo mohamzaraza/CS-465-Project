@@ -10,9 +10,9 @@
 #    Hamza:
 #        Project design: Structure, Logic, Navigation, Front-end, Back-end, AI bot integration, Filming, Documentation, AI bot configuration.
 ## 4. External Data Sources / Services
-- **AI Provider API** (OpenAI/Groq/Gemini — depending on what is allowed by class)
-- **YouTube (Unlisted Videos)** or local hosting for exercise demos
-- **TDEE formula references** for calorie calculation:
-  - Mifflin-St Jeor Equation
-  - Standard macro distribution guidelines
+# **AI Provider API** (OpenAI/Groq/Gemini — depending on what is allowed by class)
+# **YouTube (Unlisted Videos)** or local hosting for exercise demos
+# **TDEE formula references** for calorie calculation:
+ # - Mifflin-St Jeor Equation
+ # - Standard macro distribution guidelines
 
