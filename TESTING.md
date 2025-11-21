@@ -31,7 +31,7 @@
 
 ---
 
-## 5. Backend Testing (Simple)
+## 5. Backend Testing
 - Use Postman or a browser to check:
   - `/exercises` returns a list of exercises.
   - `/calculator` gives a calorie calculation when we send input.
