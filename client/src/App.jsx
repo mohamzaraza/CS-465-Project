@@ -1,32 +1,32 @@
-import { useState } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
-function App() {
-  const [message, setMessage] = useState("");
+import MainLayout from "./layout/MainLayout";
 
-  const testAPI = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/");
-      const data = await res.text();
-      setMessage(data);
-    } catch (error) {
-      setMessage("Error connecting to backend");
-      console.error(error);
-    }
-  };
+import Home from "./pages/Home";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
+import NotFound from "./pages/NotFound";
+import Calculator from "./pages/Calculator";
+import MealPlan from "./pages/MealPlan";
+import Workouts from "./pages/Workouts";
 
+
+export default function App() {
   return (
-    <div style={{ padding: "20px", fontFamily: "sans-serif" }}>
-      <h1>Frontend ↔ Backend Connection Test</h1>
-
-      <button onClick={testAPI} style={{ padding: "10px 20px", marginTop: "10px" }}>
-        Test Backend Connection
-      </button>
-
-      <p style={{ marginTop: "20px", fontSize: "18px" }}>
-        {message && `Response: ${message}`}
-      </p>
-    </div>
+    <Router>
+      <MainLayout>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/calculator" element={<Calculator />} />
+          <Route path="/mealplan" element={<MealPlan />} />
+          <Route path="/workouts" element={<Workouts />} />
+          
+          {/* Catch all unmatched routes */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </MainLayout>
+    </Router>
   );
 }
-
-export default App;
