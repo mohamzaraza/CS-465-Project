@@ -1,3 +1,7 @@
 export default function MealPlan() {
-  return <h1>Meal Plans Page</h1>;
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <h1 className="text-3xl">Meal Plan Page</h1>
+    </div>
+  );
 }
