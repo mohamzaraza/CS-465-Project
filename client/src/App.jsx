@@ -1,5 +1,4 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-
 import MainLayout from "./layout/MainLayout";
 
 import Home from "./pages/Home";
@@ -9,21 +8,21 @@ import NotFound from "./pages/NotFound";
 import Calculator from "./pages/Calculator";
 import MealPlan from "./pages/MealPlan";
 import Workouts from "./pages/Workouts";
-
+import Welcome from "./pages/Welcome";
 
 export default function App() {
   return (
     <Router>
       <MainLayout>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Welcome />} />
+          <Route path="/home" element={<Home />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/calculator" element={<Calculator />} />
           <Route path="/mealplan" element={<MealPlan />} />
           <Route path="/workouts" element={<Workouts />} />
-          
-          {/* Catch all unmatched routes */}
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </MainLayout>
