@@ -13,6 +13,11 @@ export default function FeatureCardsSection() {
         bg-gradient-to-t from-transparent to-[#111]">
       </div>
 
+      {/* Fade OUT into dark (Bottom Part) */}
+      <div className="absolute bottom-0 left-0 w-full h-40 
+          bg-gradient-to-b from-transparent to-[#111]">
+      </div>
+
       {/* TOP GREEK BORDER */}
       <div className="w-full text-center text-olympus-gold text-3xl 
         font-display tracking-widest mb-16">

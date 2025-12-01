@@ -33,6 +33,16 @@ export default function PillarsSection() {
     <section className="relative py-32 bg-[url('/src/assets/temple.jpg')]
      bg-center bg-fixed text-white">
 
+      {/* Fade Upper part (Same as Hero) */}
+      <div className="absolute top-0 left-0 w-full h-40 
+        bg-gradient-to-t from-transparent to-[#111]">
+      </div>
+
+      {/* Fade OUT into dark (Bottom Part) */}
+      <div className="absolute bottom-0 left-0 w-full h-40 
+          bg-gradient-to-b from-transparent to-[#111]">
+      </div>
+
       {/* Top Greek border */}
       <div className="w-full text-center text-olympus-gold text-3xl font-display tracking-widest mb-16">
         ────══❖  SILVER MEANDER BORDER  ❖══────
