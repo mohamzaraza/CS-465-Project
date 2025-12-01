@@ -2,14 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Optional: global reset */
-body {
+/* GLOBAL RESET */
+* {
   margin: 0;
   padding: 0;
-  background-color: #111; /* temporary dark background */
+  box-sizing: border-box; /* prevents width overflow */
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  background-color: #111;
   color: white;
 }
 
+/* Smooth fade animation */
 @keyframes fadeInSlow {
   0% { opacity: 0; transform: translateY(20px); }
   100% { opacity: 1; transform: translateY(0); }
@@ -17,4 +25,40 @@ body {
 
 .animate-fadeInSlow {
   animation: fadeInSlow 1.4s ease forwards;
+}
+
+/* Force Tailwind containers to be FULL WIDTH */
+.container {
+  max-width: 100% !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* OLYMPUS SCROLLBAR */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: black; /* Olympus black */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C9A86A; /* Olympus gold */
+  border-radius: 10px;
+  border: 2px solid #0B0C10;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #E7D5A4; /* light gold */
+}
+
+/* GREEK GOLD GLOW ON HOVER */
+.greek-glow {
+  transition: all 0.3s ease;
+}
+
+.greek-glow:hover {
+  text-shadow: 0 0 15px rgba(201,168,106,0.8), 0 0 40px rgba(255,215,130,0.6);
+  color: #E7D5A4;
 }

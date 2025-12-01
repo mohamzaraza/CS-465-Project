@@ -8,12 +8,13 @@ module.exports = {
     extend: {
       backgroundImage: {
         "hero-olympus": "url('/src/assets/homebg.jpg')",
-        "hero-greek":
-          "url('https://images.unsplash.com/photo-1603166980821-2a343b3bf3f1?auto=format&fit=crop&w=1600&q=80')",
-        "marble-dark":
-          "url('https://images.unsplash.com/photo-1587307358481-884c4d843012?auto=format&fit=crop&w=1600&q=80')",
-        "marble-gold":
-          "url('https://images.unsplash.com/photo-1589987607627-6160f8798ed1?auto=format&fit=crop&w=1600&q=80')"
+        "marble-dark": "url('/src/assets/dark-marble.jpg')",
+        "marble-white-gold" : "url('/src/assets/gold-marble.avif')",
+        "marble-grey" : "url('/src/assets/grey-marble.jpg')",
+        "marble-black-gold" : "url('/src/assets/blackg-marble.jpg')",
+        "strength-silhouette" : "url('/src/assets/arnold-back.jpg')",
+        "temple" : "url('/src/assets/temple.jpg')",
+        
       },
 
       fontFamily: {
