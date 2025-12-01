@@ -9,6 +9,8 @@ import Calculator from "./pages/Calculator";
 import MealPlan from "./pages/MealPlan";
 import Workouts from "./pages/Workouts";
 import Welcome from "./pages/Welcome";
+import Dieting from "./pages/Dieting";
+import KevAi from "./pages/KevAi";
 
 export default function App() {
   return (
@@ -18,6 +20,8 @@ export default function App() {
           <Route path="/" element={<Welcome />} />
           <Route path="/home" element={<Home />} />
           <Route path="/about" element={<About />} />
+          <Route path="/kevai" element={<KevAi/>} />
+          <Route path="/dieting" element={<Dieting />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/calculator" element={<Calculator />} />
           <Route path="/mealplan" element={<MealPlan />} />

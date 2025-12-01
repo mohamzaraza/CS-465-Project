@@ -11,7 +11,7 @@ export default function MainLayout({ children }) {
   return (
     <>
       {!hideLayout && <Navbar />}
-      <main style={{ padding: hideLayout ? "0" : "20px" }}>
+      <main style={{ padding: hideLayout ? "0" : "0" }}>
         {children}
       </main>
       {!hideLayout && <Footer />}
