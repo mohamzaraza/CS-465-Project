@@ -13,6 +13,22 @@ export default function Welcome() {
       {/* Content */}
       <div className="relative z-10 text-center max-w-4xl px-6">
 
+        {/* Logo */}
+        <div className="flex justify-center mb-10 animate-fadeInSlow">
+          <img
+            src="/src/assets/navlogo.png"
+            alt="LiftLogic Logo"
+            className="
+              w-40 h-40 object-contain mx-auto
+              drop-shadow-[0_0_25px_rgba(255,255,255,0.9)]
+              drop-shadow-[0_0_55px_rgba(201,168,106,0.9)]
+              drop-shadow-[0_0_90px_rgba(201,168,106,0.7)]
+              brightness-125
+              transition-all duration-300
+            "
+          />
+        </div>
+
         {/* Main Title */}
         <h1 className="text-titan font-display text-olympus-gold tracking-[0.15em] drop-shadow-2xl animate-fadeInSlow">
           ASCEND TO OLYMPUS
