@@ -2,44 +2,51 @@ import FeatureCards from "./FeatureCards";
 
 export default function FeatureCardsSection() {
   return (
-    <section
-      className="relative py-32 
-      bg-[url('/src/assets/dark-marble.jpg')]
-      bg-cover bg-center bg-fixed text-white"
-    >
+    <section className="
+      relative py-32 
+      bg-[url('/src/assets/dark-marble.jpg')] bg-cover bg-center bg-fixed 
+      text-white
+    ">
 
-      {/* Fade INTO marble (matches the hero fade) */}
-      <div className="absolute top-0 left-0 w-full h-40 
-        bg-gradient-to-t from-transparent to-[#111]">
+      {/* Fade into marble */}
+      <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-t from-transparent to-[#111]"></div>
+
+      {/* Fade Lower */}
+      <div className="absolute bottom-0 left-0 w-full h-40 
+          bg-gradient-to-b from-transparent to-[#111]" />
+
+      {/* LiftLogic Crest */}
+      <div className="flex justify-center mb-12">
+        <img
+          src="/src/assets/logo.svg"
+          alt="LiftLogic Logo"
+          className="w-36 opacity-95 drop-shadow-[0_0_35px_rgba(201,168,106,0.55)] animate-pulse"
+        />
       </div>
 
-      {/* TOP GREEK BORDER */}
-      <div className="w-full text-center text-olympus-gold text-3xl 
-        font-display tracking-widest mb-16">
-        ────══❖  SILVER MEANDER BORDER  ❖══────
+      {/* Greek Border Top */}
+      <div className="w-full text-center text-olympus-gold text-3xl font-display tracking-widest mb-14">
+        ────══❖  LIFTLOGIC DISCIPLINES  ❖══────
       </div>
 
-      {/* SECTION TITLE */}
-      <div className="text-center mb-20 px-4 animate-fadeInSlow">
-        <h2 className="text-5xl font-display text-olympus-gold 
-          drop-shadow-[0_0_15px_rgba(201,168,106,0.45)]">
-          Your Transformation Begins Here
+      {/* Header */}
+      <div className="text-center mb-20 px-4">
+        <h2 className="text-5xl font-display text-olympus-gold drop-shadow-[0_0_15px_rgba(201,168,106,0.45)]">
+          Choose Your Path
         </h2>
-
         <p className="mt-6 text-gray-300 text-lg max-w-2xl mx-auto leading-relaxed">
-          Four disciplines forged for warriors. Choose the path that shapes your destiny.
+          Four disciplines forged for warriors. Tap into the foundations of every transformation.
         </p>
       </div>
 
-      {/* CARDS */}
+      {/* Cards */}
       <div className="max-w-6xl mx-auto px-6">
         <FeatureCards />
       </div>
 
-      {/* BOTTOM BORDER */}
-      <div className="w-full text-center text-olympus-gold text-3xl 
-        font-display tracking-widest mt-20">
-        ────══❖  SILVER MEANDER BORDER  ❖══────
+      {/* Greek Border Bottom */}
+      <div className="w-full text-center text-olympus-gold text-3xl font-display tracking-widest mt-20">
+        ────══❖  LIFTLOGIC DISCIPLINES  ❖══────
       </div>
 
     </section>

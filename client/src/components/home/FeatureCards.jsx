@@ -1,8 +1,15 @@
 import { useState } from "react";
-import Card from "../ui/Card";
 
 export default function FeatureCards() {
-  const [openCard, setOpenCard] = useState(null);
+  const [openCards, setOpenCards] = useState([]);
+
+  const toggleCard = (id) => {
+    setOpenCards((prev) =>
+      prev.includes(id)
+        ? prev.filter((cardId) => cardId !== id)
+        : [...prev, id]
+    );
+  };
 
   const cards = [
     {
@@ -10,65 +17,79 @@ export default function FeatureCards() {
       title: "TRAIN",
       subtitle: "Workouts • Tutorials • Videos",
       description:
-        "Master your body with structured programs, exercise tutorials, hypertrophy training, strength routines, and cinematic workout videos designed to unlock your fullest potential.",
+        "Develop power, precision, and mastery through structured routines designed for strength and hypertrophy.",
     },
     {
       id: "nourish",
       title: "NOURISH",
-      subtitle: "Dieting • Meal Plans • Calculator",
+      subtitle: "Diet • Meal Plans • Calculator",
       description:
-        "Fuel your transformation with tailored nutrition tools, calorie calculations, meal plans, macro tracking, and guides built for long-term discipline and sustainable strength.",
+        "Fuel your transformation with balanced meals, macro guidance, and proper protein intake.",
     },
     {
       id: "transform",
       title: "TRANSFORM",
-      subtitle: "AI Coach • Guidance • Advice",
+      subtitle: "AI Coach • Guidance",
       description:
-        "Your personal fitness AI mentor — answer questions, design programs, optimize your routine, and guide you on the path from ordinary to exceptional.",
+        "Your personal Oracle. AI-powered coaching, program design, and insights crafted for your journey.",
     },
     {
       id: "compete",
       title: "COMPETE",
-      subtitle: "PR Tracker • Stats • Leaderboard",
+      subtitle: "PR • Metrics • Leaderboard",
       description:
-        "Track personal records, compare your progress, analyze strength metrics, and rise through the ranks in a competitive environment forged for warriors.",
+        "Track strength, log PRs, compare stats, and rise through the ranks of disciplined warriors.",
     },
   ];
 
-  const toggleCard = (id) => {
-    setOpenCard(prev => (prev === id ? null : id));
-  };
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-      {cards.map((card) => (
-        <div
-          key={card.id}
-          className="cursor-pointer transform transition-all duration-300 hover:scale-[1.03]"
-          onClick={() => toggleCard(card.id)}
-        >
-          <Card
-            className={`
-              h-full flex flex-col justify-between
-              ${openCard === card.id ? "shadow-[0_0_35px_rgba(201,168,106,0.45)] scale-[1.03]" : ""}
-            `}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+      {cards.map((card) => {
+        const isOpen = openCards.includes(card.id);
+
+        return (
+          <div
+            key={card.id}
+            className="flex flex-col items-center gap-4"
           >
-            <h3 className="text-3xl font-display text-olympus-gold text-center mb-3">
-              {card.title}
-            </h3>
+            {/* CARD */}
+            <div
+              onClick={() => toggleCard(card.id)}
+              className={`
+                relative w-full cursor-pointer
+                bg-black/40 backdrop-blur-md rounded-2xl p-8
+                border border-olympus-gold/25 
+                shadow-[0_0_20px_rgba(0,0,0,0.5)]
+                transition-all duration-500 transform
+                hover:-translate-y-3
+                ${
+                  isOpen
+                    ? "scale-[1.05] -translate-y-6 shadow-[0_0_40px_rgba(201,168,106,0.45)]"
+                    : ""
+                }
+              `}
+            >
+              {/* TITLE */}
+              <h3 className="relative text-3xl font-display text-olympus-gold text-center z-10 drop-shadow-md">
+                {card.title}
+              </h3>
 
-            <p className="text-center text-gray-300 text-sm uppercase tracking-wide">
-              {card.subtitle}
-            </p>
-
-            {openCard === card.id && (
-              <p className="mt-6 text-gray-200 leading-relaxed text-center animate-fadeInSlow">
-                {card.description}
+              {/* SUBTITLE */}
+              <p className="relative text-center text-gray-300 text-sm uppercase tracking-wide z-10 mt-1">
+                {card.subtitle}
               </p>
-            )}
-          </Card>
-        </div>
-      ))}
+
+              {/* EXPANDED TEXT */}
+              {isOpen && (
+                <p className="relative mt-6 text-gray-200 leading-relaxed text-center animate-fadeInSlow z-10">
+                  {card.description}
+                </p>
+              )}
+            </div>
+
+          </div>
+        );
+      })}
     </div>
   );
 }

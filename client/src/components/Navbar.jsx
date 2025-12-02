@@ -28,8 +28,15 @@ ${isHome && !scrolled ? "bg-transparent" : "bg-black/80 shadow-lg"}`}>
 
 <nav className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4 text-white">
 {/* Logo */}
-<Link to="/" className="font-bold tracking-wide text-xl text-olympus-gold">
-LiftLogic
+<Link to="/" className="flex items-center gap-3">
+  <img
+    src="/src/assets/navlogo.png"
+    alt="LiftLogic Logo"
+    className="w-14 h-14 object-contain drop-shadow-[0_0_12px_rgba(201,168,106,0.6)]"
+  />
+  <span className="font-display text-2xl text-olympus-gold tracking-wide">
+    LiftLogic
+  </span>
 </Link>
 
 

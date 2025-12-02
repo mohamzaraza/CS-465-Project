@@ -12,7 +12,6 @@ module.exports = {
         "marble-white-gold" : "url('/src/assets/gold-marble.avif')",
         "marble-grey" : "url('/src/assets/grey-marble.jpg')",
         "marble-black-gold" : "url('/src/assets/blackg-marble.jpg')",
-        "strength-silhouette" : "url('/src/assets/arnold-back.jpg')",
         "temple" : "url('/src/assets/temple.jpg')",
         
       },

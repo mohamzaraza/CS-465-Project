@@ -2,6 +2,11 @@ export default function Footer() {
   return (
     <footer className="relative bg-[url('/src/assets/dark-marble.jpg')] bg-cover bg-center text-gray-300 pt-20 pb-10">
 
+      {/* Fade Upper part (Same as Hero) */}
+      <div className="absolute top-0 left-0 w-full h-40 
+        bg-gradient-to-t from-transparent to-[#111]">
+      </div>
+
       {/* TOP BORDER */}
       <div className="w-full text-center text-olympus-gold text-3xl font-display tracking-widest mb-16">
         ────══❖  LIFTLOGIC  ❖══────

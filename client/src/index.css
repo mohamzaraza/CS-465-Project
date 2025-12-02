@@ -62,3 +62,110 @@ html, body, #root {
   text-shadow: 0 0 15px rgba(201,168,106,0.8), 0 0 40px rgba(255,215,130,0.6);
   color: #E7D5A4;
 }
+
+/* === PILLAR FLIP CARD & LIGHTNING EFFECTS === */
+
+.flip-card {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  perspective: 1200px;
+  transition: transform 0.3s ease;
+}
+
+@media (min-width: 1024px) {
+  .flip-card {
+    height: 360px;
+  }
+}
+
+.flip-card:hover {
+  transform: translateY(-4px);
+}
+
+.flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.flip-inner.is-flipped {
+  transform: rotateY(180deg);
+}
+
+.flip-face {
+  position: absolute;
+  inset: 0;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(201, 168, 106, 0.35);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  text-align: center;
+  overflow: hidden;
+}
+
+.flip-back {
+  transform: rotateY(180deg);
+}
+
+/* Base lightning animation keyframes (we tint with colors in the classes) */
+@keyframes lightningBase {
+  0% {
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+  }
+  15% {
+    box-shadow: 0 0 35px rgba(255, 255, 255, 0.9),
+      0 0 80px rgba(255, 255, 255, 0.5);
+  }
+  30% {
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.4),
+      0 0 60px rgba(255, 255, 255, 0.2);
+  }
+  45% {
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+  }
+  100% {
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* Color-tinted lightning on hover */
+.lightning-red:hover .flip-face {
+  animation: lightningBase 220ms ease-out;
+  box-shadow: 0 0 40px rgba(178, 58, 72, 0.9),
+    0 0 90px rgba(178, 58, 72, 0.6);
+}
+
+.lightning-green:hover .flip-face {
+  animation: lightningBase 220ms ease-out;
+  box-shadow: 0 0 40px rgba(46, 204, 113, 0.9),
+    0 0 90px rgba(46, 204, 113, 0.6);
+}
+
+.lightning-blue:hover .flip-face {
+  animation: lightningBase 220ms ease-out;
+  box-shadow: 0 0 40px rgba(52, 152, 219, 0.9),
+    0 0 90px rgba(52, 152, 219, 0.6);
+}
+
+.lightning-white:hover .flip-face {
+  animation: lightningBase 220ms ease-out;
+  box-shadow: 0 0 40px rgba(255, 255, 255, 0.9),
+    0 0 90px rgba(255, 255, 255, 0.6);
+}
+
+.lightning-gold:hover .flip-face {
+  animation: lightningBase 220ms ease-out;
+  box-shadow:
+    0 0 40px rgba(201, 168, 106, 0.9),
+    0 0 90px rgba(201, 168, 106, 0.6);
+}
+
