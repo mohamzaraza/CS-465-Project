@@ -11,9 +11,9 @@ export default function PillarCard({
   const [flipped, setFlipped] = useState(false);
 
   const colorClassMap = {
-    strength: "lightning-red",
-    nutrition: "lightning-green",
-    consistency: "lightning-white",
+    strength: "lightning-gold",
+    nutrition: "lightning-gold",
+    consistency: "lightning-gold",
     mindset: "lightning-gold",
   };
 

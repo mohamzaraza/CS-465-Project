@@ -169,3 +169,9 @@ html, body, #root {
     0 0 90px rgba(201, 168, 106, 0.6);
 }
 
+.workout-button {
+  @apply bg-black/40 backdrop-blur-md border border-olympus-gold/40 rounded-2xl 
+         py-10 text-center text-2xl font-display text-olympus-gold 
+         hover:scale-105 hover:shadow-[0_0_35px_rgba(201,168,106,0.4)] 
+         transition-all duration-300;
+}
