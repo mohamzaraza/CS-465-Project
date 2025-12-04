@@ -1,4 +1,4 @@
-import ChatWindow from "../components/kevai/ChatWindow";
+import KevAiChat from "../components/kevai/KevAiChat"; 
 
 export default function KevAi() {
   return (
@@ -17,7 +17,7 @@ export default function KevAi() {
 
       {/* Chat Window */}
       <div className="max-w-4xl mx-auto">
-        <ChatWindow />
+        <KevAiChat />
       </div>
 
     </div>
