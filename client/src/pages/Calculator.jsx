@@ -149,7 +149,7 @@ export default function Calculator() {
       className="
         min-h-screen w-screen overflow-x-hidden
         flex items-center justify-center
-        px-4 py-10
+        px-4 pt-28 pb-10
         bg-gradient-to-b from-black via-[#050508] to-[#050308]
         relative
       "
