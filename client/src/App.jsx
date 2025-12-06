@@ -10,6 +10,9 @@ import MealPlan from "./pages/MealPlan";
 import Welcome from "./pages/Welcome";
 import Dieting from "./pages/Dieting";
 import KevAi from "./pages/KevAi";
+import Barracks from "./pages/Barracks";
+import TheForge from "./pages/TheForge"
+import Colosseum from "./pages/Colosseum";
 
 // Workouts home
 import WorkoutsHome from "./pages/workouts/index";
@@ -49,6 +52,12 @@ export default function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/calculator" element={<Calculator />} />
           <Route path="/mealplan" element={<MealPlan />} />
+
+          {/* Premium Pages */}
+
+          <Route path="/barracks" element={<Barracks />} />
+          <Route path="/theforge" element={<TheForge />} />
+          <Route path="/colosseum" element={<Colosseum />} />
 
           {/* Workouts Home */}
           <Route path="/workouts" element={<WorkoutsHome />} />

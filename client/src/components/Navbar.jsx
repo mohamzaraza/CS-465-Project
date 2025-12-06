@@ -60,11 +60,17 @@ Calculator</Link>
 <Link to="/mealplan" className="hover:text-olympus-gold transition-colors duration-200">
 MealPlan</Link>
 
-<Link to="/about" className="hover:text-olympus-gold transition-colors duration-200">
-About</Link>
+<Link to="/barracks" className="hover:text-olympus-gold transition-colors duration-200">
+Barracks</Link>
 
-<Link to="/contact" className="hover:text-olympus-gold transition-colors duration-200">
-Contact</Link>
+<Link to="/theforge" className="hover:text-olympus-gold transition-colors duration-200">
+The Forge</Link>
+
+<Link to="/colosseum" className="hover:text-olympus-gold transition-colors duration-200">
+Colosseum</Link>
+
+
+
 
 </div>
 </nav>
