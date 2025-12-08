@@ -1,105 +1,113 @@
+import TotalLeaderboard from "../components/colosseum/TotalLeaderboard";
+
 export default function Colosseum() {
+  const isPremiumUser = false; // TEMP — replace later with real auth
+
   return (
     <div className="min-h-screen bg-[#111] text-white pt-32 pb-20 px-6">
 
-      {/* HERO */}
-      <div className="text-center mb-16">
-        <h1 className="text-6xl font-display text-red-600 drop-shadow-[0_0_35px_rgba(255,50,50,0.5)]">
-          The Colosseum
+      {/* ======================= HERO ======================= */}
+      <div className="text-center mb-20">
+        <h1 className="text-6xl font-display text-red-600 drop-shadow-[0_0_40px_rgba(255,40,40,0.6)]">
+          THE COLOSSEUM
         </h1>
+
         <p className="text-gray-300 mt-4 max-w-3xl mx-auto text-lg leading-relaxed">
           Strength without measurement is illusion.  
-          Here, your numbers are tested. Your discipline is weighed.  
-          And your rank is forged in comparison with others who walk the same path.
+          Here, your limits are exposed — and your rank is carved in stone.
         </p>
       </div>
 
-      {/* PHILOSOPHY */}
-      <section className="max-w-4xl mx-auto mb-20 space-y-10">
-        <ColosseumSection
+      {/* ====================== EDUCATIONAL SECTIONS ====================== */}
+      <section className="max-w-4xl mx-auto mb-20 space-y-12">
+
+        <InfoBlock
           title="Why Rank?"
-          content="Competition reveals the truth — your current level, your weaknesses, and the gap between who you are and who you claim to be. The Colosseum is not about ego. It is about clarity, progress, and accountability."
+          content="Competition reveals the truth — your current level, your weaknesses, and the gap between who you are and who you claim to be. Ranking creates clarity, accountability, and direction."
         />
 
-        <ColosseumSection
+        <InfoBlock
           title="The LiftLogic Strength Index"
-          content="You will eventually be ranked using a unified score based on your Squat, Bench, Deadlift, and bodyweight. A lightweight lifter outlifting his weight class will be rewarded. A heavyweight with true power will rise accordingly."
+          content="Your future rank will be built using multi-lift scoring across the major movements: Squat, Bench, and Deadlift. Weight moved relative to bodyweight determines your true standing."
         />
 
-        <ColosseumSection
+        <InfoBlock
           title="How Ranking Works"
-          content="Scores scale with bodyweight, reps, intensity, and lift category. The free version shows example leaderboards. The Premium version will calculate your exact score and place you among the ranks."
+          content="The free version shows example boards. The Premium version calculates your actual numbers, assigns your tier, and places you among other lifters."
         />
       </section>
 
-      {/* MOCK LEADERBOARDS */}
-      <section className="max-w-6xl mx-auto mb-20">
-        <h2 className="text-center text-4xl font-display text-red-500 mb-12 drop-shadow-[0_0_25px_rgba(255,0,0,0.4)]">
-          Leaderboards (Examples)
-        </h2>
+      {/* ==================== FREE LEADERBOARDS ==================== */}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          <LeaderboardCard
-            title="Bench Press"
-            data={[
-              { name: "Marcus A.", score: "355 lb" },
-              { name: "Damon R.", score: "325 lb" },
-              { name: "Elias V.", score: "295 lb" },
-            ]}
-          />
+      <div className="max-w-5xl mx-auto mt-20">
+      <TotalLeaderboard />
+      </div>
 
-          <LeaderboardCard
-            title="Squat"
-            data={[
-              { name: "Valerius P.", score: "475 lb" },
-              { name: "Kade M.", score: "455 lb" },
-              { name: "Juno T.", score: "420 lb" },
-            ]}
-          />
 
-          <LeaderboardCard
-            title="Deadlift"
-            data={[
-              { name: "Omar R.", score: "585 lb" },
-              { name: "Niklas D.", score: "560 lb" },
-              { name: "Theo L.", score: "540 lb" },
-            ]}
-          />
-
-          <LeaderboardCard
-            title="Total Strength"
-            data={[
-              { name: "Kael R.", score: "1335 lb" },
-              { name: "Marcos S.", score: "1260 lb" },
-              { name: "Riven D.", score: "1215 lb" },
-            ]}
-          />
-        </div>
-      </section>
-
-      {/* PREMIUM CTA */}
-      <section className="text-center mt-20">
-        <h2 className="text-4xl font-display text-red-500 mb-6">
-          Want to Know Your True Rank?
-        </h2>
-
-        <p className="text-gray-300 max-w-xl mx-auto mb-10">
-          The Premium Colosseum evaluates your lifts, bodyweight, and performance  
-          to determine your exact placement among lifters worldwide.
-        </p>
-
-        <button className="px-12 py-4 bg-red-600 text-black rounded-xl font-display text-xl hover:scale-105 transition-all">
-          Unlock Your Ranking (LiftLogic Plus)
+      {/* =================== GET RANKED BUTTON =================== */}
+      <div className="text-center mb-24">
+        <button className="px-12 py-4 mt-12 bg-red-600 text-black font-display text-xl rounded-xl hover:scale-105 transition-all shadow-[0_0_25px_rgba(255,0,0,0.5)]">
+          Begin Your Ranking Trial
         </button>
+      </div>
+
+      {/* ===================== PREMIUM DOTS SECTION ===================== */}
+      <section className="max-w-5xl mx-auto mb-20">
+        <h2 className="text-center text-4xl font-display text-red-500 mb-10 drop-shadow-[0_0_25px_rgba(255,0,0,0.4)]">
+          DOTS Powerlifting Leaderboards
+        </h2>
+
+        <div
+          className={`
+            p-10 rounded-2xl border border-red-800/40 bg-black/40 backdrop-blur-sm
+            ${!isPremiumUser ? "blur-sm pointer-events-none select-none" : ""}
+          `}
+        >
+          {/* STATIC DOTS (real world) */}
+          <div className="mb-12">
+            <h3 className="text-2xl text-red-400 font-display mb-4">
+              Titans of Strength (Real Rankings)
+            </h3>
+            <div className="bg-black/30 border border-gray-700 p-6 rounded-xl">
+              <p className="text-gray-500 italic">
+                Top 30 world athletes will appear here.
+              </p>
+            </div>
+          </div>
+
+          {/* LIFTLOGIC DOTS */}
+          <div>
+            <h3 className="text-2xl text-red-400 font-display mb-4">
+              LiftLogic DOTS Leaderboard
+            </h3>
+            <div className="bg-black/30 border border-gray-700 p-6 rounded-xl">
+              <p className="text-gray-500 italic">
+                Ranked LiftLogic users will appear here.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* PREMIUM CTA */}
+        {!isPremiumUser && (
+          <div className="text-center mt-10">
+            <p className="text-gray-400 mb-4">
+              Unlock advanced scoring, DOTS ranking, and profile progression with
+            </p>
+            <button className="px-10 py-3 bg-red-600 text-black rounded-xl font-display hover:scale-105 transition-all">
+              Upgrade to LiftLogic Plus
+            </button>
+          </div>
+        )}
       </section>
 
     </div>
   );
 }
 
-/* COMPONENTS */
+/* ====================== COMPONENTS ====================== */
 
-function ColosseumSection({ title, content }) {
+function InfoBlock({ title, content }) {
   return (
     <div>
       <h2 className="text-3xl font-display text-red-500 mb-3">{title}</h2>
@@ -108,22 +116,3 @@ function ColosseumSection({ title, content }) {
   );
 }
 
-function LeaderboardCard({ title, data }) {
-  return (
-    <div className="bg-black/40 border border-red-600/40 p-6 rounded-2xl shadow-lg backdrop-blur-sm">
-      <h3 className="text-2xl font-display text-red-500 mb-4">{title}</h3>
-
-      <ul className="space-y-3">
-        {data.map((item, i) => (
-          <li
-            key={i}
-            className="flex justify-between bg-black/30 border border-gray-700 rounded-lg px-4 py-2"
-          >
-            <span className="text-gray-200">{item.name}</span>
-            <span className="text-red-400 font-bold">{item.score}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
