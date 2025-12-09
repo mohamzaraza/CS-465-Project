@@ -5,16 +5,23 @@ import Footer from "../components/Footer";
 export default function MainLayout({ children }) {
   const location = useLocation();
 
-  // Hide navbar/footer on Welcome page
-  const hideLayout = location.pathname === "/";
+  // Pages that hide both navbar & footer
+  const hideFullLayout = location.pathname === "/";
+
+  // Pages that hide ONLY the footer
+  const hideFooter =
+    location.pathname === "/colosseum";  // <--- Add more here if needed
 
   return (
     <>
-      {!hideLayout && <Navbar />}
-      <main style={{ padding: hideLayout ? "0" : "0" }}>
-        {children}
-      </main>
-      {!hideLayout && <Footer />}
+      {/* Navbar */}
+      {!hideFullLayout && <Navbar />}
+
+      {/* Content */}
+      <main>{children}</main>
+
+      {/* Footer */}
+      {!hideFullLayout && !hideFooter && <Footer />}
     </>
   );
 }

@@ -1,4 +1,64 @@
-import TotalLeaderboard from "../components/colosseum/TotalLeaderboard";
+import TotalLeaderboard from "../../components/colosseum/TotalLeaderboard";
+
+const mockLeaderboard = [
+  {
+    name: "Emiliano C.",
+    total: 1350,
+    tier: "Immortal",
+    mastery: 3,
+  },
+  {
+    name: "Ares H.",
+    total: 1280,
+    tier: "Celestial",
+    mastery: 2,
+  },
+  {
+    name: "Valeria S.",
+    total: 1210,
+    tier: "Divine",
+    mastery: 1,
+  },
+  {
+    name: "Niklas D.",
+    total: 1195,
+    tier: "Olympian",
+    mastery: 1,
+  },
+  {
+    name: "Marcus A.",
+    total: 1120,
+    tier: "Titan",
+    mastery: 4,
+  },
+  {
+    name: "Maximus D.",
+    total: 1100,
+    tier: "Champion",
+    mastery: 2,
+  },
+  {
+    name: "Larry Wheels",
+    total: 1000,
+    tier: "Heroic",
+    mastery: 3,
+  },
+  {
+    name: "Sam Sulek",
+    total: 995,
+    tier: "Warrior",
+    mastery: 1,
+  },
+  {
+    name: "Chris Bumstead",
+    total: 960,
+    tier: "Novice",
+    mastery: 0,
+  }
+];
+
+
+
 
 export default function Colosseum() {
   const isPremiumUser = false; // TEMP — replace later with real auth
@@ -40,7 +100,7 @@ export default function Colosseum() {
       {/* ==================== FREE LEADERBOARDS ==================== */}
 
       <div className="max-w-5xl mx-auto mt-20">
-      <TotalLeaderboard />
+      <TotalLeaderboard data={mockLeaderboard}/>
       </div>
 
 
