@@ -12,7 +12,9 @@ import Dieting from "./pages/Dieting";
 import KevAi from "./pages/KevAi";
 import Barracks from "./pages/Barracks";
 import TheForge from "./pages/TheForge"
-import Colosseum from "./pages/Colosseum";
+import ColosseumGate from "./components/colosseum/ColosseumGate";   // NEW GATE WRAPPER
+// ColosseumPage is NOW loaded inside ColosseumGate only, never routed directly.
+
 
 // Workouts home
 import WorkoutsHome from "./pages/workouts/index";
@@ -57,7 +59,10 @@ export default function App() {
 
           <Route path="/barracks" element={<Barracks />} />
           <Route path="/theforge" element={<TheForge />} />
-          <Route path="/colosseum" element={<Colosseum />} />
+          <Route path="/colosseum"element={<MainLayout hideFooter={true}> <ColosseumGate /> </MainLayout>}
+          />
+
+          {/*<Route path="/colosseum" element={<Colosseum />} />*/}
 
           {/* Workouts Home */}
           <Route path="/workouts" element={<WorkoutsHome />} />
