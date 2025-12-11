@@ -7,6 +7,8 @@ import aiRoutes from "./routes/aiRoutes.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import rankingRoutes from "./routes/rankingRoutes.js";
+
 // Required for dotenv to load correctly in ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,6 +25,7 @@ app.use(express.json());
 
 // API ROUTES
 app.use("/api", aiRoutes);
+app.use("/api/rank", rankingRoutes);
 
 // Default test route
 app.get("/", (req, res) => {

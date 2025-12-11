@@ -1,0 +1,15 @@
+export const muscleMultipliers = {
+  chest: 1.2,
+  back: 1.25,
+  quads: 1.25,
+  glutes: 1.2,
+  hamstrings: 1.15,
+  shoulders: 1.05,
+  lowerBack: 1.0,
+  triceps: 0.9,
+  biceps: 0.85,
+  abs: 0.85,
+  obliques: 0.8,
+  forearms: 0.8,
+  calves: 0.8,
+};

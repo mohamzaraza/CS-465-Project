@@ -1,14 +1,100 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
-generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
-}
+// prisma/schema.prisma
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+// =========================
+// ENUMS
+// =========================
+
+enum StrengthTier {
+  UNTRAINED
+  NOVICE
+  WARRIOR
+  HEROIC
+  CHAMPION
+  TITAN
+  OLYMPIAN
+  DIVINE
+  CELESTIAL
+  IMMORTAL
+  PRIMORDIAL
+}
+
+enum MasteryLevel {
+  UNTRAINED
+  DISCIPLINED
+  FULL_MASTERY
+  ASCENDED
+}
+
+enum MuscleGroup {
+  CHEST
+  BACK
+  SHOULDERS
+  QUADS
+  HAMSTRINGS
+  BICEPS
+  TRICEPS
+  FOREARMS
+  ABS
+}
+
+// =========================
+// MODELS
+// =========================
+
+model User {
+  id        String          @id @default(uuid())
+  email     String          @unique
+  password  String
+  createdAt DateTime        @default(now())
+
+  // Relations
+  muscleMastery MuscleMastery[]
+  muscleRanks   MuscleRank[]
+}
+
+model MuscleMastery {
+  id        String   @id @default(uuid())
+  muscle    String
+  mastery   String   // "UNTRAINED", "DISCIPLINED", "FULL_MASTERY", "ASCENDED"
+  progress  Int      @default(0)    // tracked changes toward next mastery
+  updatedAt DateTime @updatedAt
+
+  // Relation to user
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+}
+
+model MuscleRank {
+  id        String   @id @default(uuid())
+  muscle    String   // “chest”, “back”, etc.
+  tier      String   // “Novice”, “Warrior”, “Heroic”, etc.
+  score     Int
+  updatedAt DateTime @updatedAt
+
+  // Relation to user
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+}
+
+model UserLiftsLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  muscle    String
+  liftName  String
+  weight    Float
+  reps      Int
+  timestamp DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+

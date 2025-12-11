@@ -1,4 +1,5 @@
 import colosseumTiers from "../../config/colosseumTiers";
+import colosseumMastery from "../../config/colosseumMastery"
 
 export default function LeaderboardRow({ user, rank }) {
   // Normalize tier key (capitalize first letter)
@@ -6,6 +7,7 @@ export default function LeaderboardRow({ user, rank }) {
     user.tier.charAt(0).toUpperCase() + user.tier.slice(1).toLowerCase();
 
   const tier = colosseumTiers[tierKey];
+  const mastery = colosseumMastery[user.mastery]; // ★★★ HERE
 
   // Fail-safe for undefined tiers
   if (!tier) {
@@ -90,14 +92,19 @@ export default function LeaderboardRow({ user, rank }) {
           </span>
         </div>
 
-        {/* STARS */}
-        <div className="flex gap-1 mt-2">
-          {Array.from({ length: user.mastery }).map((_, idx) => (
-            <span key={idx} className="text-yellow-300 text-xl drop-shadow-md">
-              ★
-            </span>
-          ))}
-        </div>
+              {/* MASTERY STARS */}
+              <div className="flex gap-1 mt-2">
+                {Array.from({ length: mastery.stars }).map((_, idx) => (
+                  <span key={idx} className="text-yellow-300 text-xl drop-shadow-md">
+                    ★
+                  </span>
+                ))}
+              </div>
+
+              {/* OPTIONAL LABEL */}
+              <p style={{ color: mastery.color, fontSize: "0.9rem" }}>
+                {mastery.label}
+              </p>
 
         {/* TOTAL STRENGTH */}
         <p className="mt-2 text-red-400 font-bold text-xl">
