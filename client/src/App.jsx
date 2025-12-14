@@ -3,6 +3,8 @@ import MainLayout from "./layout/MainLayout";
 
 import Home from "./pages/Home";
 import About from "./pages/About";
+import Philosophy from "./pages/Philosophy";
+import Roadmap from "./pages/Roadmap";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import Calculator from "./pages/Calculator";
@@ -49,6 +51,8 @@ export default function App() {
           <Route path="/" element={<Welcome />} />
           <Route path="/home" element={<Home />} />
           <Route path="/about" element={<About />} />
+          <Route path="/philosophy" element={<Philosophy />} />
+          <Route path="/roadmap" element={<Roadmap />} />
           <Route path="/kevai" element={<KevAi/>} />
           <Route path="/dieting" element={<Dieting />} />
           <Route path="/contact" element={<Contact />} />
