@@ -1,108 +1,53 @@
-import colosseumTiers from "../../config/colosseumTiers";
+import tierStyles from "../../config/colosseumTiers";
 
-export default function LeaderboardRow({ user, rank }) {
-  // Normalize tier key (capitalize first letter)
+const GRID =
+  "grid grid-cols-[80px_1fr_140px_120px_100px] items-center";
+
+
+export default function LeaderboardRow({ row }) {
+  // Normalize enum → display key
   const tierKey =
-    user.tier.charAt(0).toUpperCase() + user.tier.slice(1).toLowerCase();
+    row.tier?.charAt(0) +
+    row.tier?.slice(1).toLowerCase();
 
-  const tier = colosseumTiers[tierKey];
+  const tierStyle = tierStyles[tierKey];
 
-  // Fail-safe for undefined tiers
-  if (!tier) {
-    console.error("Unknown tier:", user.tier);
+  // Absolute safety fallback (NEVER crash leaderboard)
+  if (!tierStyle) {
+    console.warn("Unknown tier received:", row.tier);
     return (
-      <div className="p-6 rounded-xl bg-red-900 text-white">
-        ERROR: Unknown tier "{user.tier}"
+      <div className="flex justify-between px-4 py-2 text-gray-500">
+        <span>#{row.rank}</span>
+        <span>{row.user}</span>
+        <span>Unknown</span>
+        <span>{row.score}</span>
       </div>
     );
   }
 
-  // Pick solid or gradient plate automatically
-  const plateStyle =
-    tier.plateType === "gradient"
-      ? { background: tier.gradient }
-      : { backgroundColor: tier.plate };
-
-  // ICONS FOR #1 #2 #3
-  const specialIcon =
-    rank === 1
-      ? "/src/assets/colosseum/Crown.png"
-      : rank === 2
-      ? "/src/assets/colosseum/Helmetg.png"
-      : rank === 3
-      ? "/src/assets/colosseum/Warriorr.png"
-      : null;
-
   return (
     <div
-      className="
-        p-5 rounded-2xl bg-black/40 backdrop-blur-md
-        border border-red-700/40
-        shadow-[0_0_35px_rgba(255,0,0,0.25)]
-        flex items-center gap-6
-      "
+      className={`${GRID} px-4 py-3 rounded-lg`}
+      style={{ background: tierStyle.background }}
     >
-      {/* RANK + ICON */}
-      <div className="flex flex-col items-center w-20">
-        <span className="text-5xl font-display text-red-500">{rank}</span>
+      <span className="text-gray-400">#{row.rank}</span>
 
-        {specialIcon && (
-          <img
-            src={specialIcon}
-            className="
-              w-12 h-12 mt-2 object-contain
-              drop-shadow-[0_0_12px_rgba(255,0,0,0.6)]
-            "
-          />
-        )}
-      </div>
+      <span className="font-medium truncate">
+        {row.user}
+      </span>
 
-      {/* USER INFO BLOCK */}
-      <div className="flex flex-col flex-1">
+      <span className="text-center font-display">
+        {tierKey}
+      </span>
 
-        {/* PLATE */}
-        <div
-          className="
-            w-full px-5 py-3 rounded-lg shadow-lg
-            flex items-center justify-between
-          "
-          style={{
-            ...plateStyle,
-            border: `2px solid ${tier.border}`,
-            boxShadow: `0 0 15px ${tier.glow}`,
-          }}
-        >
-          <span
-            className="text-2xl font-display font-bold"
-            style={{ color: tier.text }}
-          >
-            {user.name}
-          </span>
+      <span className="text-right text-gray-300">
+        {row.score}
+      </span>
 
-          <span
-            className="text-sm px-3 py-1 rounded-md border font-bold tracking-wide"
-            style={{
-              color: tier.text,
-              borderColor: tier.text + "55",
-            }}
-          >
-            {tierKey}
-          </span>
-        </div>
-
-        {/* STARS */}
-        <div className="flex gap-1 mt-2">
-          {Array.from({ length: user.mastery }).map((_, idx) => (
-            <span key={idx} className="text-yellow-300 text-xl drop-shadow-md">
-              ★
-            </span>
-          ))}
-        </div>
-
-        {/* TOTAL STRENGTH */}
-        <p className="mt-2 text-red-400 font-bold text-xl">
-          {user.total} lb Total
-        </p>
+      <div className="flex justify-end gap-1">
+        {Array.from({ length: tierStyle.stars }).map((_, i) => (
+          <span key={i}>⭐</span>
+        ))}
       </div>
     </div>
   );
