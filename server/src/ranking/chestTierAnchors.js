@@ -71,15 +71,15 @@ export const CHEST_TIER_ANCHORS = {
   },
 
   Celestial: {
-    bench:      { weight: 315, reps: 2 },
-    incline_db: { weight: 95, reps: 6 },
+    bench:      { weight: 315, reps: 4 },
+    incline_db: { weight: 95, reps: 8 },
     cable:      { weight: 45, reps: 10 },
   },
 
   Immortal: {
-    bench:      { weight: 365, reps: 1 },
-    incline_db: { weight: 105, reps: 4 },
-    cable:      { weight: 50, reps: 10 },
+    bench:      { weight: 365, reps: 4 },
+    incline_db: { weight: 105, reps: 8 },
+    cable:      { weight: 50, reps: 12 },
   },
 
   Primordial: {

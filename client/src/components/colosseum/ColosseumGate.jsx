@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
-import ColosseumPage from "../../pages/colosseum/ColosseumPage"; // your actual UI
+import ColosseumPage from "../../pages/colosseum/ColosseumPage";
 import colosseumIntro from "../../assets/colosseum/ArenaCutscene.mov";
+import RankChestPanel from "./RankChestPanel";
 
 export default function ColosseumGate() {
   const [step, setStep] = useState("loading"); 

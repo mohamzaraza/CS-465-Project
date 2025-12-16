@@ -61,11 +61,13 @@ model User {
   password  String
   createdAt DateTime @default(now())
 
-  // Relations
+  lastChestRankAt DateTime?
+
   muscleMasteries MuscleMastery[]
   muscleRanks     MuscleRank[]
   liftLogs        UserLiftsLog[]
 }
+
 
 // ==== PER-MUSCLE MASTERY TRACKING ====
 model MuscleMastery {
@@ -83,16 +85,16 @@ model MuscleMastery {
 
 // ==== PER-MUSCLE RANK (TIER) ====
 model MuscleRank {
-  id String @id @default(uuid())
-
-  muscle    MuscleGroup // ENUM
-  tier      StrengthTier // ENUM
+  id        String        @id @default(uuid())
+  muscle    MuscleGroup
+  tier      StrengthTier
   score     Int
-  updatedAt DateTime     @updatedAt
+  updatedAt DateTime      @updatedAt
 
-  // Relation to user
   userId String
   user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, muscle], name: "userId_muscle")
 }
 
 // ==== LIFT LOGS ====

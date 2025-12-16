@@ -6,7 +6,6 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import Calculator from "./pages/Calculator";
-import MealPlan from "./pages/MealPlan";
 import Welcome from "./pages/Welcome";
 import Dieting from "./pages/Dieting";
 import KevAi from "./pages/KevAi";
@@ -41,7 +40,27 @@ import Abs from "./pages/workouts/core/Abs";
 import Obliques from "./pages/workouts/core/Obliques";
 import LowerBack from "./pages/workouts/core/LowerBack";
 
+//AUTHENTICATION
+import { useAuth } from "./context/AuthContext";
+
+import ProtectedRoute from "./components/ProtectedRoute";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+
+import RankChest from "./pages/RankChest";
+
+
 export default function App() {
+    const { loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        Loading...
+      </div>
+    ); 
+  }
+
   return (
     <Router>
       <MainLayout>
@@ -53,16 +72,16 @@ export default function App() {
           <Route path="/dieting" element={<Dieting />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/calculator" element={<Calculator />} />
-          <Route path="/mealplan" element={<MealPlan />} />
 
           {/* Premium Pages */}
 
-          <Route path="/barracks" element={<Barracks />} />
-          <Route path="/theforge" element={<TheForge />} />
-          <Route path="/colosseum"element={<MainLayout hideFooter={true}> <ColosseumGate /> </MainLayout>}
-          />
+          <Route path="/barracks" element={<ProtectedRoute><Barracks /></ProtectedRoute>}/>
+          <Route path="/theforge" element={<ProtectedRoute><TheForge /></ProtectedRoute>} />
+          <Route path="/colosseum"element={<ProtectedRoute><ColosseumGate /></ProtectedRoute>}/>
 
-          {/*<Route path="/colosseum" element={<Colosseum />} />*/}
+          {/* LOGIN */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
           {/* Workouts Home */}
           <Route path="/workouts" element={<WorkoutsHome />} />
@@ -88,6 +107,8 @@ export default function App() {
           <Route path="/workouts/core/abs" element={<Abs />} />
           <Route path="/workouts/core/obliques" element={<Obliques />} />
           <Route path="/workouts/core/lowerback" element={<LowerBack />} />
+
+          <Route path="/rank/chest" element={<ProtectedRoute><RankChest /></ProtectedRoute>}/>
 
 
           <Route path="*" element={<NotFound />} />
