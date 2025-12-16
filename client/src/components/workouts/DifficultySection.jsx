@@ -1,19 +1,36 @@
+// src/components/workouts/DifficultySection.jsx
+
 import DifficultyBanner from "./DifficultyBanner";
+import ExerciseCard from "./ExerciseCard";
+import { chestExercises } from "../../data/chestExercises";
 
 export default function DifficultySection({ difficulty }) {
+  // "Newcomer" -> "newcomer"
+  const tier = (difficulty || "").toLowerCase();
+
+  // Filter exercises for this tier
+  const exercises = chestExercises.filter((ex) => ex.tier === tier);
+
   return (
     <section className="py-20 border-t border-gray-700/40 mt-10">
+      {/* Banner */}
       <DifficultyBanner
         title={difficulty}
         subtitle={`Exercises for ${difficulty} lifters`}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10 max-w-6xl mx-auto px-6">
-        <p className="text-gray-500 text-center col-span-full">
-          Exercises will go here.
-        </p>
+      {/* Exercises grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-6xl mx-auto px-6">
+        {exercises.length === 0 ? (
+          <p className="text-gray-500 text-center col-span-full">
+            No exercises added for this tier yet.
+          </p>
+        ) : (
+          exercises.map((exercise) => (
+            <ExerciseCard key={exercise.id} exercise={exercise} />
+          ))
+        )}
       </div>
-      
     </section>
   );
 }
