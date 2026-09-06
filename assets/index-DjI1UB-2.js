@@ -207,7 +207,7 @@ ${h&&!l?"bg-transparent":"bg-black/80 shadow-lg"}`,children:o.jsxs("nav",{classN
         ${i}
       `,children:l})}function wv(){return o.jsxs("div",{className:"w-screen overflow-x-hidden bg-black",children:[o.jsxs("section",{className:`\r
           relative min-h-[100vh] w-full\r
-          bg-[url('/src/assets/nigger.jpg')]\r
+          bg-[url('/src/assets/food.jpg')]\r
           bg-cover bg-[center_63%] bg-fixed\r
           flex items-center\r
         `,children:[o.jsx("div",{className:"absolute inset-0 bg-gradient-to-b from-black/80 via-black/70 to-black/90"}),o.jsx("div",{className:"relative w-full max-w-6xl mx-auto px-4 pt-32 pb-20 md:pb-24 ",children:o.jsx(Ea,{children:o.jsx(mv,{})})})]}),o.jsxs("section",{className:`\r
