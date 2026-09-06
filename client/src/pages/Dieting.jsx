@@ -19,7 +19,7 @@ export default function Dieting() {
       <section
         className="
           relative min-h-[100vh] w-full
-          bg-[url('/src/assets/nigger.jpg')]
+          bg-[url('/src/assets/food.jpg')]
           bg-cover bg-[center_63%] bg-fixed
           flex items-center
         "
