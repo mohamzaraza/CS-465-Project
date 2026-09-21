@@ -1,51 +1,22 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
+// Must stay the first import: later modules may read process.env as they load.
+import "./config/dotenv.js";
 
-import aiRoutes from "./routes/aiRoutes.js";
+import { loadEnv } from "./config/env.js";
+import { createApp } from "./app.js";
 
-import path from "path";
-import { fileURLToPath } from "url";
+let config;
+try {
+  config = loadEnv();
+} catch (err) {
+  // Fail fast: starting without a database URL or JWT secret would only
+  // surface later as confusing per-request errors.
+  console.error(err.message);
+  process.exit(1);
+}
 
-import rankingRoutes from "./routes/rankingRoutes.js";
-
-import authRoutes from "./routes/authRoutes.js";
-
-import leaderboardRoutes from "./routes/leaderboardRoutes.js";
-
-// Required for dotenv to load correctly in ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load .env explicitly from the server folder
-dotenv.config({ path: path.join(__dirname, ".env") });
-
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// API ROUTES
-app.use("/api", aiRoutes);
-app.use("/api/rank", rankingRoutes);
-
-//AUTHENTICATION
-app.use("/api/auth", authRoutes);
-
-//LEADERBOARD
-app.use("/api/leaderboard", leaderboardRoutes);
-
-// Default test route
-app.get("/", (req, res) => {
-  res.send("Backend is running!");
-});
+const app = createApp(config);
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(config.port, () => {
+  console.log(`Server running on http://localhost:${config.port}`);
 });
-
-
-

@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import ColosseumPage from "../../pages/colosseum/ColosseumPage";
 import colosseumIntro from "../../assets/colosseum/ArenaCutscene.mov";
-import RankChestPanel from "./RankChestPanel";
 
 export default function ColosseumGate() {
   // Read the flag during the first render so the right step shows immediately,

@@ -1,11 +1,13 @@
 import { askKevAi } from "../services/openaiService.js";
+import { validateChatMessage } from "../utils/validateInputs.js";
 
 export async function handleKevAi(req, res) {
   try {
-    const { message } = req.body;
+    const message = req.body?.message;
 
-    if (!message) {
-      return res.status(400).json({ error: "Message is required." });
+    const problem = validateChatMessage(message);
+    if (problem) {
+      return res.status(400).json({ error: problem });
     }
 
     const reply = await askKevAi(message);

@@ -3,6 +3,20 @@ import { askKevAi } from "../../lib/kevaiClient";
 import { ApiError } from "../../lib/api";
 import ReactMarkdown from "react-markdown";
 
+// The server's wording for these is aimed at API callers; in the chat they
+// deserve a line that tells the user what to do next.
+const FRIENDLY_STATUS_MESSAGES = {
+  401: "Your session has ended. Please log in again to talk to KevAi.",
+  429: "KevAi needs a breather. You've sent a lot of messages; wait a few minutes and try again.",
+};
+
+function chatErrorMessage(err) {
+  if (!(err instanceof ApiError)) {
+    return "KevAi encountered an issue reaching the Oracle. Try again in a moment.";
+  }
+  return FRIENDLY_STATUS_MESSAGES[err.status] ?? err.message;
+}
+
 export default function KevAiChat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -29,10 +43,7 @@ export default function KevAiChat() {
       const errMsg = {
         role: "assistant",
         error: true,
-        content:
-          err instanceof ApiError
-            ? `⚠ ${err.message}`
-            : "⚠ KevAi encountered an issue reaching the Oracle. Try again in a moment.",
+        content: `⚠ ${chatErrorMessage(err)}`,
       };
 
       setMessages((prev) => [...prev, errMsg]);

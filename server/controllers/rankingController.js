@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { computeChestTier } from "../src/ranking/chestRanking.js";
+import { MS_PER_HOUR, RANK_COOLDOWN_HOURS } from "../config/constants.js";
 
 export async function rankChest(req, res) {
   try {
@@ -14,9 +15,9 @@ export async function rankChest(req, res) {
 
     if (user.lastChestRankAt) {
       const hoursSince =
-        (Date.now() - new Date(user.lastChestRankAt).getTime()) / 36e5;
+        (Date.now() - new Date(user.lastChestRankAt).getTime()) / MS_PER_HOUR;
 
-      if (hoursSince < 12) {
+      if (hoursSince < RANK_COOLDOWN_HOURS) {
         return res.status(403).json({
           error: "Chest ranking locked. Try again later.",
         });

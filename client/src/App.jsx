@@ -61,7 +61,7 @@ export default function App() {
           <Route path="/about" element={<About />} />
           <Route path="/philosophy" element={<Philosophy />} />
           <Route path="/roadmap" element={<Roadmap />} />
-          <Route path="/kevai" element={<KevAi/>} />
+          <Route path="/kevai" element={<ProtectedRoute><KevAi/></ProtectedRoute>} />
           <Route path="/dieting" element={<Dieting />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/calculator" element={<Calculator />} />

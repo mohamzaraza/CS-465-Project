@@ -1,20 +1,21 @@
 import jwt from "jsonwebtoken";
 
+// Nothing here is logged: headers and tokens are credentials, and a 401 is
+// routine traffic, not a server fault.
 export function authenticateToken(req, res, next) {
-  console.log("AUTH HEADER:", req.headers.authorization);
-  console.log("JWT SECRET LOADED:", process.env.JWT_SECRET?.length);
+  const [scheme, token, ...rest] = (req.headers.authorization ?? "").split(" ");
 
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(" ")[1];
-
-  if (!token) {
-    return res.status(401).json({ error: "Missing token" });
+  if (scheme !== "Bearer" || !token || rest.length > 0) {
+    return res.status(401).json({ error: "Missing or malformed authorization header." });
   }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
-      console.error("JWT VERIFY ERROR:", err.message);
-      return res.status(401).json({ error: "Invalid token" });
+      const message =
+        err.name === "TokenExpiredError"
+          ? "Your session has expired. Please log in again."
+          : "Invalid token.";
+      return res.status(401).json({ error: message });
     }
 
     req.user = user;

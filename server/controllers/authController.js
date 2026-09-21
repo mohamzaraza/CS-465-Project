@@ -1,22 +1,23 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma.js";
-
-const JWT_SECRET = process.env.JWT_SECRET;
+import { BCRYPT_ROUNDS, JWT_EXPIRES_IN } from "../config/constants.js";
+import { validateLogin, validateRegistration } from "../utils/validateInputs.js";
 
 export async function register(req, res) {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: "Missing fields" });
+  const problem = validateRegistration(req.body);
+  if (problem) {
+    return res.status(400).json({ error: problem });
   }
+
+  const { email, password } = req.body;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return res.status(409).json({ error: "Email already in use" });
   }
 
-  const hashed = await bcrypt.hash(password, 12);
+  const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
   await prisma.user.create({
     data: { email, password: hashed },
@@ -28,6 +29,11 @@ export async function register(req, res) {
 
 export async function login(req, res) {
   try {
+    const problem = validateLogin(req.body);
+    if (problem) {
+      return res.status(400).json({ error: problem });
+    }
+
     const { email, password } = req.body;
 
     const user = await prisma.user.findUnique({
@@ -52,7 +58,7 @@ export async function login(req, res) {
         createdAt: user.createdAt,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: JWT_EXPIRES_IN }
     );
 
     res.json({
