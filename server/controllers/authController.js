@@ -19,9 +19,19 @@ export async function register(req, res) {
 
   const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-  await prisma.user.create({
-    data: { email, password: hashed },
-  });
+  try {
+    await prisma.user.create({
+      data: { email, password: hashed },
+    });
+  } catch (err) {
+    // Two sign-ups for the same email can both pass the check above; the
+    // database's unique constraint (Prisma code P2002) then rejects the second,
+    // which is the same "email taken" case, not a server fault.
+    if (err?.code === "P2002") {
+      return res.status(409).json({ error: "Email already in use" });
+    }
+    throw err;
+  }
 
   res.status(201).json({ message: "User created" });
 }

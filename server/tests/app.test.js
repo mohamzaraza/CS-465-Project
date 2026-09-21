@@ -151,6 +151,22 @@ describe("POST /api/auth/register", () => {
     expect(res.status).toBe(400);
   });
 
+  it("answers 409 when a concurrent sign-up wins the unique email constraint", async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockRejectedValue(
+      Object.assign(new Error("Unique constraint failed on the fields: (`email`)"), {
+        code: "P2002",
+      })
+    );
+
+    const res = await request(app)
+      .post("/api/auth/register")
+      .send({ email: "a@b.co", password: "longenough" });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: "Email already in use" });
+  });
+
   it("routes a database failure to the central error handler as JSON", async () => {
     prisma.user.findUnique.mockRejectedValue(new Error("connection refused"));
 
