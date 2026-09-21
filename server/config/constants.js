@@ -1,3 +1,6 @@
+// Tunable limits get names here so each reason is written down once and the
+// controllers, routes and tests all use the same value.
+
 // A user may re-rank a muscle only this often, so scores reflect training
 // progress rather than repeated attempts.
 export const RANK_COOLDOWN_HOURS = 12;

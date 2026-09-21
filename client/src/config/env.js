@@ -1,3 +1,6 @@
+// The only place the client learns the server's address, so switching between
+// local and deployed servers never means editing components.
+//
 // Vite inlines import.meta.env at build time, so this is fixed per build and
 // must be set in the environment that runs `npm run build`, not at runtime.
 const configuredUrl = import.meta.env.VITE_API_URL;

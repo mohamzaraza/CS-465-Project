@@ -49,8 +49,8 @@ The workload will (initially) be divided as follows:
 
 ## 3. External Data Sources / Services
 
-- **AI Provider API** (OpenAI / Groq / Gemini)  
-- **YouTube (Unlisted Videos)** or local hosting for exercise demos  
+- **AI Provider API**: OpenAI (`gpt-4o-mini`), called only from the server (`server/services/openaiService.js`) so the API key never reaches the browser  
+- **Exercise demo videos**: hosted locally as MP4 files in `client/public/videos/`  
 - **TDEE formula references** for calorie calculation:  
   - Mifflin-St Jeor Equation  
   - Standard macro distribution guidelines  

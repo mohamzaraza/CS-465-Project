@@ -1,3 +1,5 @@
+// Checks the environment once at startup, so a missing secret stops the server
+// with a message naming it instead of surfacing as a failed request later.
 const REQUIRED = ["DATABASE_URL", "JWT_SECRET"];
 
 const DEFAULT_PORT = 5000;

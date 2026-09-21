@@ -1,3 +1,6 @@
+// Every call to the server goes through apiRequest so the status check,
+// timeout, JSON parsing, auth header and user-facing error text are written
+// once. Pages that each used fetch directly had drifted and some skipped them.
 import { API_URL } from "../config/env";
 import { storage } from "../utils/storage";
 

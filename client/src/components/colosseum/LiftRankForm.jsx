@@ -1,3 +1,6 @@
+// Shared by the Colosseum's chest panel and the /rank/chest page, which used to
+// carry separate copies of this form. The lifts come from config/liftConfigs.js,
+// so ranking another muscle needs a config entry, not a third copy.
 import { useEffect, useState } from "react";
 import { apiRequest } from "../../lib/api";
 

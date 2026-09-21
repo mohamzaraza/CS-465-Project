@@ -1,3 +1,7 @@
+// Routes report failures with next(err) or by throwing, and this module turns
+// them into one JSON error shape. Clients get consistent errors, and internals
+// such as stack traces stay in the server log.
+
 // Express 5 already forwards rejected promises to the error middleware; the
 // wrapper keeps that guarantee explicit at every route and would keep working
 // on Express 4.

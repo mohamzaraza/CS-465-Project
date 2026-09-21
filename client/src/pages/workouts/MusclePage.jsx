@@ -1,3 +1,6 @@
+// One page serves every /workouts/:region/:muscle URL from data/muscleGroups.js.
+// It replaces 13 copied pages that had drifted apart (all of them showed chest
+// exercises), so a fix or a new muscle now lands in one place.
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import WorkoutInfoHeader from "../../components/workouts/WorkoutInfoHeader";

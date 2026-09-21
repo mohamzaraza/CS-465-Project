@@ -1,3 +1,5 @@
+// The server validates for itself because the client's checks are a courtesy:
+// any HTTP client can skip them.
 import { CHAT_MAX_LENGTH } from "../config/constants.js";
 
 // Each validator returns a message for the client, or null when the input is
