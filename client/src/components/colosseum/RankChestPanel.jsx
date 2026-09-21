@@ -6,7 +6,6 @@ export default function RankChestPanel() {
   const [incline, setIncline] = useState({ weight: "", reps: "" });
   const [cable, setCable] = useState({ weight: "", reps: "" });
 
-  const [result, setResult] = useState(null);
   const [currentRank, setCurrentRank] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -41,7 +40,6 @@ export default function RankChestPanel() {
         },
       });
 
-      setResult(data);
       setCurrentRank(data); // 🔴 CRITICAL: sync UI with DB result
     } catch (err) {
       setError(err.message);

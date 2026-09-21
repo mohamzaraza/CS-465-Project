@@ -3,11 +3,9 @@ import DifficultyNav from "../../../components/workouts/DifficultyNav";
 import DifficultySection from "../../../components/workouts/DifficultySection";
 import BackButton from "../../../components/workouts/BackButton";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 export default function Biceps() {
   const [selected, setSelected] = useState("newcomer");
-  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-[#111] text-white py-32 px-6">

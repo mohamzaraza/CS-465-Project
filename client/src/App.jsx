@@ -43,7 +43,7 @@ import Obliques from "./pages/workouts/core/Obliques";
 import LowerBack from "./pages/workouts/core/LowerBack";
 
 //AUTHENTICATION
-import { useAuth } from "./context/AuthContext";
+import { useAuth } from "./context/useAuth";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";

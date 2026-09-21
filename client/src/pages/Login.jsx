@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { apiRequest } from "../lib/api";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -13,7 +13,6 @@ export default function Login() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    console.log("LOGIN SUBMIT FIRED");
     setError(null);
 
     try {

@@ -27,7 +27,6 @@ export async function register(req, res) {
 
 
 export async function login(req, res) {
-  console.log("PRISMA IS:", prisma);
   try {
     const { email, password } = req.body;
 

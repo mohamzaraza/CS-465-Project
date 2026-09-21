@@ -12,7 +12,6 @@ export default function ColosseumPage() {
         return res.json();
       })
       .then((data) => {
-        console.log("LEADERBOARD DATA:", data);
         setLeaderboard(data);
       })
       .catch(console.error);

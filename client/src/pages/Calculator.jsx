@@ -5,7 +5,7 @@
 //  - UI split into <CalculatorForm /> + <CalculatorResults />
 // ================================================
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 
 // Components
 import CalculatorForm from "../components/calculator/CalculatorForm";
@@ -98,12 +98,6 @@ export default function Calculator() {
   });
 
   // -----------------------------
-  //  CALCULATED RESULTS STATE
-  // -----------------------------
-  const [results, setResults] = useState(null);
-
-
-  // -----------------------------
   //  ON INPUT CHANGE
   // -----------------------------
   const handleChange = (e) => {
@@ -118,10 +112,9 @@ export default function Calculator() {
   // -----------------------------
   //  LIVE CALCULATION
   // -----------------------------
-  useEffect(() => {
-    const computed = computeResults(form);
-    setResults(computed);
-  }, [form]);
+  // Results are derived from the form, so compute them during render rather
+  // than mirroring them into state (which cost an extra render per keystroke).
+  const results = useMemo(() => computeResults(form), [form]);
 
 
   // -----------------------------

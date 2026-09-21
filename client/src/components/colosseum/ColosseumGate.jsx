@@ -4,62 +4,29 @@ import colosseumIntro from "../../assets/colosseum/ArenaCutscene.mov";
 import RankChestPanel from "./RankChestPanel";
 
 export default function ColosseumGate() {
-  const [step, setStep] = useState("loading"); 
+  // Read the flag during the first render so the right step shows immediately,
+  // instead of rendering nothing and correcting it from an effect.
+  const [step, setStep] = useState(() =>
+    localStorage.getItem("ArenaCutscene.mov_seen") ? "warning" : "cinematic"
+  );
   const videoRef = useRef(null);
 
+  // Alt+R replays the intro while developing; production builds must not
+  // intercept keys, so the listener is never registered there.
   useEffect(() => {
-  const debug = (e) => {
-    console.log(
-      "%cDEBUG KEY:", 
-      "color: yellow; font-weight: bold;",
-      { key: e.key, ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey }
-    );
-  };
+    if (!import.meta.env.DEV) return;
 
-  window.addEventListener("keydown", debug);
-  return () => window.removeEventListener("keydown", debug);
-}, []);
+    const handler = (e) => {
+      if (e.altKey && e.key.toLowerCase() === "r") {
+        localStorage.removeItem("ArenaCutscene.mov_seen");
+        window.location.reload();
+      }
+    };
 
-useEffect(() => {
-  const handler = (e) => {
-    console.log("Handler RECEIVED key:", e.key, "ctrl:", e.ctrlKey);
+    document.addEventListener("keydown", handler, { capture: true });
 
-    if (e.ctrlKey && e.key.toLowerCase() === "r") {
-      console.log("%cRESET MATCHED — clearing flag", "color: red; font-weight: bold;");
-      localStorage.removeItem("ArenaCutscene.mov_seen");
-      window.location.reload();
-    }
-  };
-
-  window.addEventListener("keydown", handler, { capture: true });
-  return () => window.removeEventListener("keydown", handler, { capture: true });
-}, []);
-
-
-
-  useEffect(() => {
-    const seen = localStorage.getItem("ArenaCutscene.mov_seen");
-
-    if (!seen) {
-      setStep("cinematic");
-    } else {
-      setStep("warning");
-    }
+    return () => document.removeEventListener("keydown", handler, { capture: true });
   }, []);
-
-  useEffect(() => {
-  const handler = (e) => {
-    if (e.altKey && e.key.toLowerCase() === "r") {
-      console.log("Resetting cutscene flag...");
-      localStorage.removeItem("ArenaCutscene.mov_seen");
-      window.location.reload(); 
-    }
-  };
-
-  document.addEventListener("keydown", handler, { capture: true });
-
-  return () => document.removeEventListener("keydown", handler, { capture: true });
-}, []);
 
 
   // After cinematic ends
@@ -72,8 +39,6 @@ useEffect(() => {
   function handleAcceptWarning() {
     setStep("colosseum");
   }
-
-  if (step === "loading") return null;
 
   /* -------------------------------
       STEP 1 — CINEMATIC INTRO
