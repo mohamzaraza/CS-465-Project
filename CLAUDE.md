@@ -30,6 +30,8 @@ Full-stack fitness app. client/ is React 19 + Vite + Tailwind. server/ is Expres
 
 \- If a prompt conflicts with the code, or something is ambiguous, stop and ask me instead of guessing.
 
+\- Never use sed -i or any tool that rewrites line endings. After editing, check that git diff --stat shows only the lines you meant to change.
+
 
 
 \## Out of scope (planned for later enhancements: do NOT fix or edit)

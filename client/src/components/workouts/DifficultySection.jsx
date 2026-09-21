@@ -2,14 +2,15 @@
 
 import DifficultyBanner from "./DifficultyBanner";
 import ExerciseCard from "./ExerciseCard";
-import { chestExercises } from "../../data/chestExercises";
 
-export default function DifficultySection({ difficulty }) {
+// The page passes in its own muscle's exercises; importing a data file here
+// is what made every muscle page show the chest exercises.
+export default function DifficultySection({ difficulty, exercises: allExercises = [] }) {
   // "Newcomer" -> "newcomer"
   const tier = (difficulty || "").toLowerCase();
 
   // Filter exercises for this tier
-  const exercises = chestExercises.filter((ex) => ex.tier === tier);
+  const exercises = allExercises.filter((ex) => ex.tier === tier);
 
   return (
     <section className="py-20 border-t border-gray-700/40 mt-10">
