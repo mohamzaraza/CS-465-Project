@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { apiRequest } from "../lib/api";
 import { useAuth } from "../context/useAuth";
 
 export default function Login() {
@@ -9,20 +8,14 @@ export default function Login() {
   const [error, setError] = useState(null);
 
   const navigate = useNavigate();
-  const { setUser } = useAuth();
+  const { login } = useAuth();
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
 
     try {
-      const data = await apiRequest("/auth/login", "POST", {
-        email,
-        password,
-      });
-
-      localStorage.setItem("token", data.token);
-      setUser(data.user);
+      await login(email, password);
 
       setTimeout(() => {
       navigate("/colosseum");

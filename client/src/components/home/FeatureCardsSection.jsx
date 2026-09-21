@@ -1,4 +1,5 @@
 import FeatureCards from "./FeatureCards";
+import logo from "../../assets/logo.svg";
 
 export default function FeatureCardsSection() {
   return (
@@ -18,7 +19,7 @@ export default function FeatureCardsSection() {
       {/* LiftLogic Crest */}
       <div className="flex justify-center mb-12">
         <img
-          src="/src/assets/logo.svg"
+          src={logo}
           alt="LiftLogic Logo"
           className="w-36 opacity-95 drop-shadow-[0_0_35px_rgba(201,168,106,0.55)] animate-pulse"
         />

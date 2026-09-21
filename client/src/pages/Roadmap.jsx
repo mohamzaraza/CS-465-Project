@@ -5,7 +5,7 @@ export default function Roadmap() {
     <section
       className="
         relative min-h-screen w-screen
-        bg-[url('/src/assets/greymarble.jpg')]
+        bg-[url('/src/assets/grey-marble.jpg')]
         bg-cover bg-center bg-fixed
         flex items-center justify-center
         text-gray-200

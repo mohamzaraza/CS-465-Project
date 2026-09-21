@@ -1,5 +1,13 @@
 import React from "react";
 import Pillars from "./Pillars";
+import strengthSymbol from "../../assets/strength-symbol.png";
+import atlas from "../../assets/atlas.png";
+import nutritionSymbol from "../../assets/nutrition-symbol.png";
+import nutrition from "../../assets/nutrition.png";
+import ouroboros from "../../assets/ouroboros.png";
+import consistency from "../../assets/consistency.png";
+import helmet from "../../assets/helmet.png";
+import spartan from "../../assets/spartan.png";
 
 const pillarsData = [
   {
@@ -10,10 +18,10 @@ const pillarsData = [
       "Strength is built through disciplined effort — heavy lifts, perfect form, progressive overload, and relentless consistency.",
     
     // FRONT = symbolic Greek icon
-    frontImage: "/src/assets/strength-symbol.png",
+    frontImage: strengthSymbol,
 
     // BACK = silhouette of Spartan / warrior
-    backImage: "/src/assets/atlas.png",
+    backImage: atlas,
 
     color: "strength", // red lightning
   },
@@ -25,8 +33,8 @@ const pillarsData = [
     backText:
       "Nutrition is the fuel of discipline — surplus to grow, deficit to cut, macros aligned to your goals.",
 
-    frontImage: "/src/assets/nutrition-symbol.png",   // Symbol
-    backImage: "/src/assets/nutrition.png",              // Goddess Demeter silhouette
+    frontImage: nutritionSymbol,   // Symbol
+    backImage: nutrition,              // Goddess Demeter silhouette
 
     color: "nutrition", // green lightning
   },
@@ -38,8 +46,8 @@ const pillarsData = [
     backText:
       "Consistency beats intensity. Daily routines, habits, tracking, and unbreakable discipline lead to mastery.",
 
-    frontImage: "/src/assets/ouroboros.png",  // Greek column
-    backImage: "/src/assets/consistency.png",      // Calm statue silhouette
+    frontImage: ouroboros,  // Greek column
+    backImage: consistency,      // Calm statue silhouette
 
     color: "consistency", // white lightning
   },
@@ -51,8 +59,8 @@ const pillarsData = [
     backText:
       "Mindset turns effort into power. Sharpen your focus, embrace discipline, and rise above doubt.",
 
-    frontImage: "/src/assets/helmet.png",      // Laurel wreath
-    backImage: "/src/assets/spartan.png",            // Athena statue silhouette
+    frontImage: helmet,      // Laurel wreath
+    backImage: spartan,            // Athena statue silhouette
 
     color: "mindset", // blue lightning
   },

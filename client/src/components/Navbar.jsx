@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
+import navLogo from "../assets/navlogo.png";
 
 
 export default function Navbar() {
 const [scrolled, setScrolled] = useState(false);
 const location = useLocation();
 
-const { user, setUser } = useAuth();
+const { user, logout } = useAuth();
 const navigate = useNavigate();
 
 
@@ -25,8 +26,7 @@ return () => window.removeEventListener("scroll", handleScroll);
 const isHome = location.pathname === "/";
 
 function handleLogout() {
-  localStorage.removeItem("token");
-  setUser(null);
+  logout();
   navigate("/login");
 }
 
@@ -42,7 +42,7 @@ ${isHome && !scrolled ? "bg-transparent" : "bg-black/80 shadow-lg"}`}>
   <div className="flex items-center gap-3 shrink-0">
     <Link to="/" className="flex items-center gap-3">
       <img
-        src="/src/assets/navlogo.png"
+        src={navLogo}
         alt="LiftLogic Logo"
         className="w-14 h-14 object-contain drop-shadow-[0_0_12px_rgba(201,168,106,0.6)]"
       />

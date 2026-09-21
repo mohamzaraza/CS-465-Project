@@ -1,5 +1,8 @@
 // src/pages/About.jsx
 import React from "react";
+import hamzaPhoto from "../assets/hamza.jpg";
+import emiPhoto from "../assets/emi.jpg";
+import kevPhoto from "../assets/kev.jpg";
 
 export default function About() {
   return (
@@ -38,7 +41,7 @@ export default function About() {
             {/* Hamza */}
             <div className="bg-black/60 border border-olympus-gold/40 rounded-2xl p-6 flex flex-col items-center text-center shadow-deep">
               <div className="w-28 h-28 rounded-full overflow-hidden border border-olympus-gold/70 shadow-gold-glow mb-4">
-                <img src="/src/assets/hamza.jpg" alt="Hamza" className="w-full h-full object-cover" />
+                <img src={hamzaPhoto} alt="Hamza" className="w-full h-full object-cover" />
               </div>
               <h3 className="text-xl font-display text-olympus-gold">Hamza</h3>
               <p className="text-xs uppercase tracking-[0.15em] text-gray-400 mb-3">
@@ -53,7 +56,7 @@ export default function About() {
             {/* Emiliano */}
             <div className="bg-black/60 border border-olympus-gold/40 rounded-2xl p-6 flex flex-col items-center text-center shadow-deep">
               <div className="w-28 h-28 rounded-full overflow-hidden border border-olympus-gold/70 shadow-gold-glow mb-4">
-                <img src="/src/assets/emi.jpg" alt="Emiliano" className="w-full h-full object-cover" />
+                <img src={emiPhoto} alt="Emiliano" className="w-full h-full object-cover" />
               </div>
               <h3 className="text-xl font-display text-olympus-gold">Emiliano</h3>
               <p className="text-xs uppercase tracking-[0.15em] text-gray-400 mb-3">
@@ -68,7 +71,7 @@ export default function About() {
             {/* Kev */}
             <div className="bg-black/50 border border-white/20 rounded-2xl p-6 flex flex-col items-center text-center shadow-deep">
               <div className="w-24 h-24 rounded-full overflow-hidden border border-gray-400/40 mb-4">
-                <img src="/src/assets/kev.jpg" alt="Kev" className="w-full h-full object-cover object-[center_5%]" />
+                <img src={kevPhoto} alt="Kev" className="w-full h-full object-cover object-[center_5%]" />
               </div>
               <h3 className="text-lg font-display text-gray-200">Kev</h3>
               <p className="text-xs uppercase tracking-[0.15em] text-gray-500 mb-3">

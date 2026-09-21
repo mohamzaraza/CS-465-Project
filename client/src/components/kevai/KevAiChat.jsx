@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { askKevAi } from "../../lib/kevaiClient";
+import { ApiError } from "../../lib/api";
 import ReactMarkdown from "react-markdown";
 
 export default function KevAiChat() {
@@ -23,10 +24,15 @@ export default function KevAiChat() {
     } catch (err) {
       console.error("KevAi Chat Error:", err);
 
+      // ApiError messages are already written for the user (timeout, network,
+      // server error text), so show them; anything else gets the generic line.
       const errMsg = {
         role: "assistant",
+        error: true,
         content:
-          "⚠ KevAi encountered an issue reaching the Oracle. Try again in a moment.",
+          err instanceof ApiError
+            ? `⚠ ${err.message}`
+            : "⚠ KevAi encountered an issue reaching the Oracle. Try again in a moment.",
       };
 
       setMessages((prev) => [...prev, errMsg]);
@@ -49,9 +55,12 @@ export default function KevAiChat() {
         {messages.map((msg, i) => (
             <div
             key={i}
+            role={msg.error ? "alert" : undefined}
             className={`p-4 rounded-xl ${
                 msg.role === "user"
                 ? "bg-olympus-gold/20 border border-olympus-gold/40 text-olympus-gold"
+                : msg.error
+                ? "bg-red-950/40 border border-red-700 text-red-300"
                 : "bg-black/50 border border-gray-700"
             }`}
             >

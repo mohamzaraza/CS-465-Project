@@ -1,11 +1,15 @@
 // src/data/chestExercises.js
 
+// Videos live in public/, which Vite serves from the base path ("/" in dev,
+// "/CS-465-Project/" on GitHub Pages), so a bare "/videos/..." 404s once deployed.
+const videoUrl = (file) => `${import.meta.env.BASE_URL}videos/${file}`;
+
 export const chestExercises = [
   {
     id: "bench-press",
     name: "Barbell Bench Press",
     tier: "newcomer",
-    video: "/videos/benchpress.mp4",
+    video: videoUrl("benchpress.mp4"),
     muscles: ["Chest", "Triceps", "Front Delts"],
     cues: [
       "Feet planted firmly on the floor",
@@ -24,7 +28,7 @@ export const chestExercises = [
     id: "incline-dumbbell-press",
     name: "Incline Dumbbell Press",
     tier: "warrior",
-    video: "/videos/inclinedbpress.mp4",
+    video: videoUrl("inclinedbpress.mp4"),
     muscles: ["Upper Chest", "Front Delts", "Triceps"],
     cues: [
       "Bench set to ~30–45° incline",
@@ -43,7 +47,7 @@ export const chestExercises = [
     id: "weighted-dips",
     name: "Weighted Dips",
     tier: "elite",
-    video: "/videos/weighteddips.mp4",
+    video: videoUrl("weighteddips.mp4"),
     muscles: ["Lower Chest", "Triceps", "Front Delts"],
     cues: [
       "Slight forward torso lean",

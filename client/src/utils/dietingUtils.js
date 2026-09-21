@@ -1,4 +1,5 @@
 // src/utils/dietingUtils.js
+import chickenBreastIcon from "../assets/chickenbreast.png";
 
 // ----- Food data used by Build Your Plate -----
 export const FOOD_DATA = [
@@ -11,7 +12,7 @@ export const FOOD_DATA = [
     protein: 31,
     carbs: 0,
     fats: 3.6,
-    icon: "/src/assets/chickenbreast.png",
+    icon: chickenBreastIcon,
   },
   {
     id: "eggs-2",

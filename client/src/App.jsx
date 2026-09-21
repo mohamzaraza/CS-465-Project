@@ -44,6 +44,7 @@ import LowerBack from "./pages/workouts/core/LowerBack";
 
 //AUTHENTICATION
 import { useAuth } from "./context/useAuth";
+import AuthNavigator from "./context/AuthNavigator";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
@@ -70,6 +71,7 @@ export default function App() {
 
   return (
     <Router basename={basename}>
+      <AuthNavigator />
       <MainLayout>
         <Routes>
           <Route path="/" element={<Welcome />} />

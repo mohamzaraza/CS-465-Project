@@ -23,7 +23,7 @@ export default function RankChestPanel() {
     setLoading(true);
 
     try {
-      const data = await apiRequest("/rank/chest", "POST", {
+      const payload = {
         lifts: {
           bench: {
             weight: Number(bench.weight),
@@ -38,7 +38,8 @@ export default function RankChestPanel() {
             reps: Number(cable.reps),
           },
         },
-      });
+      };
+      const data = await apiRequest("/rank/chest", { method: "POST", body: payload });
 
       setCurrentRank(data); // 🔴 CRITICAL: sync UI with DB result
     } catch (err) {

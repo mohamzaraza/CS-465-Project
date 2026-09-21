@@ -1,6 +1,11 @@
 // src/components/dieting/FoodCategoriesSection.jsx
 
 import React from "react";
+import proteinIcon from "../../assets/protein.png";
+import carbsIcon from "../../assets/carbs.png";
+import fatsIcon from "../../assets/fats.png";
+import vegetablesIcon from "../../assets/vegetables.png";
+import fruitsIcon from "../../assets/fruits.png";
 
 export default function FoodCategoriesSection() {
   const categories = [
@@ -13,7 +18,7 @@ export default function FoodCategoriesSection() {
         "Greek yogurt, cottage cheese",
         "Protein shakes"
       ],
-      icon: "/src/assets/protein.png",
+      icon: proteinIcon,
     },
     {
       title: "Healthy Carbs",
@@ -23,7 +28,7 @@ export default function FoodCategoriesSection() {
         "Beans, lentils",
         "Fruits (especially berries)",
       ],
-      icon: "/src/assets/carbs.png",
+      icon: carbsIcon,
     },
     {
       title: "Healthy Fats",
@@ -33,7 +38,7 @@ export default function FoodCategoriesSection() {
         "Nut butters",
         "Fatty fish",
       ],
-      icon: "/src/assets/fats.png",
+      icon: fatsIcon,
     },
     {
       title: "Vegetables",
@@ -43,7 +48,7 @@ export default function FoodCategoriesSection() {
         "Peppers, carrots",
         "Tomatoes, cucumbers",
       ],
-      icon: "/src/assets/vegetables.png",
+      icon: vegetablesIcon,
     },
     {
       title: "Fruits",
@@ -53,7 +58,7 @@ export default function FoodCategoriesSection() {
         "Oranges, kiwi",
         "Grapes (watch portions)",
       ],
-      icon: "/src/assets/fruits.png",
+      icon: fruitsIcon,
     },
   ];
 

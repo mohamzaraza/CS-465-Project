@@ -1,16 +1,13 @@
 import { useEffect, useState } from "react";
 import TotalLeaderboard from "../../components/colosseum/TotalLeaderboard";
 import RankChestPanel from "../../components/colosseum/RankChestPanel";
+import { apiRequest } from "../../lib/api";
 
 export default function ColosseumPage() {
   const [leaderboard, setLeaderboard] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/leaderboard/chest")
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch leaderboard");
-        return res.json();
-      })
+    apiRequest("/leaderboard/chest")
       .then((data) => {
         setLeaderboard(data);
       })

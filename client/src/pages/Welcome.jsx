@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import navLogo from "../assets/navlogo.png";
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ export default function Welcome() {
         {/* Logo */}
         <div className="flex justify-center mb-10 animate-fadeInSlow">
           <img
-            src="/src/assets/navlogo.png"
+            src={navLogo}
             alt="LiftLogic Logo"
             className="
               w-40 h-40 object-contain mx-auto
