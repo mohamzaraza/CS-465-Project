@@ -1,8 +1,5 @@
 import LeaderboardRow from "./LeaderboardRow";
-
-
-const GRID =
-  "grid grid-cols-[80px_1fr_140px_120px_100px] items-center";
+import { LEADERBOARD_GRID } from "./leaderboardGrid";
 
   
 export default function TotalLeaderboard({ data }) {
@@ -17,7 +14,7 @@ export default function TotalLeaderboard({ data }) {
   return (
     <div className="bg-black/40 border border-red-800/40 rounded-2xl p-6 backdrop-blur-sm">
       {/* Header */}
-      <div className={`${GRID} px-4 py-2 mb-3 text-sm text-gray-400 uppercase tracking-wide`}>
+      <div className={`${LEADERBOARD_GRID} px-4 py-2 mb-3 text-sm text-gray-400 uppercase tracking-wide`}>
       <span>Rank</span>
       <span>Warrior</span>
       <span className="text-center">Tier</span>

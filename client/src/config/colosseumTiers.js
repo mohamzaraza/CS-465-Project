@@ -11,7 +11,18 @@ const colosseumTiers = {
   },
 
   /* ============================================================
-      1. NOVICE — copper tone, first true metal
+      1. RECRUIT — raw iron, entered the arena but unproven
+     ============================================================ */
+  Recruit: {
+    plateType: "gradient",
+    gradient: "linear-gradient(135deg, #2a2a2a, #4a4a4a)", // dark → forged iron
+    border: "#6e6e6e",
+    glow: "rgba(140,140,140,0.3)",
+    text: "#c4c4c4",
+  },
+
+  /* ============================================================
+      2. NOVICE — copper tone, first true metal
      ============================================================ */
   Novice: {
     plateType: "gradient",
@@ -22,7 +33,7 @@ const colosseumTiers = {
   },
 
   /* ============================================================
-      2. WARRIOR — gold accents, first honorable metal
+      3. WARRIOR — gold accents, first honorable metal
      ============================================================ */
   Warrior: {
     plateType: "gradient",
@@ -33,7 +44,7 @@ const colosseumTiers = {
   },
 
   /* ============================================================
-      3. HEROIC — bold, reddish bronze, “battle-tested”
+      4. HEROIC — bold, reddish bronze, “battle-tested”
      ============================================================ */
   Heroic: {
     plateType: "gradient",
@@ -44,7 +55,7 @@ const colosseumTiers = {
   },
 
   /* ============================================================
-      4. CHAMPION — high sheen silver-gold alloy
+      5. CHAMPION — high sheen silver-gold alloy
      ============================================================ */
   Champion: {
     plateType: "gradient",
@@ -55,7 +66,7 @@ const colosseumTiers = {
   },
 
   /* ============================================================
-      5. TITAN — darker, heavier, ancient metal
+      6. TITAN — darker, heavier, ancient metal
      ============================================================ */
   Titan: {
     plateType: "gradient",
@@ -66,7 +77,7 @@ const colosseumTiers = {
   },
 
   /* ============================================================
-      6. OLYMPIAN — bright divine gold + sky aura
+      7. OLYMPIAN — bright divine gold + sky aura
      ============================================================ */
   Olympian: {
     plateType: "gradient",
@@ -77,7 +88,7 @@ const colosseumTiers = {
   },
 
   /* ============================================================
-      7. DIVINE — platinum with holy radiance
+      8. DIVINE — platinum with holy radiance
      ============================================================ */
   Divine: {
     plateType: "gradient",
@@ -88,7 +99,7 @@ const colosseumTiers = {
   },
 
   /* ============================================================
-      8. CELESTIAL — bright cosmic blue + emerald tint
+      9. CELESTIAL — bright cosmic blue + emerald tint
      ============================================================ */
   Celestial: {
     plateType: "gradient",
@@ -99,7 +110,7 @@ const colosseumTiers = {
   },
 
   /* ============================================================
-      9. IMMORTAL — red/black god-tier with violent aura
+      10. IMMORTAL — red/black god-tier with violent aura
      ============================================================ */
   Immortal: {
     plateType: "gradient",
@@ -110,7 +121,7 @@ const colosseumTiers = {
   },
 
   /* ============================================================
-      10. PRIMORDIAL — hidden tier, forbidden color
+      11. PRIMORDIAL — hidden tier, forbidden color
      ============================================================ */
   Primordial: {
     plateType: "gradient",

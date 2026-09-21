@@ -1,7 +1,5 @@
 import tierStyles from "../../config/colosseumTiers";
-
-const GRID =
-  "grid grid-cols-[80px_1fr_140px_120px_100px] items-center";
+import { LEADERBOARD_GRID } from "./leaderboardGrid";
 
 
 export default function LeaderboardRow({ row }) {
@@ -26,10 +24,7 @@ export default function LeaderboardRow({ row }) {
   }
 
   return (
-    <div
-      className={`${GRID} px-4 py-3 rounded-lg`}
-      style={{ background: tierStyle.background }}
-    >
+    <div className={`${LEADERBOARD_GRID} px-4 py-3 rounded-lg`}>
       <span className="text-gray-400">#{row.rank}</span>
 
       <span className="font-medium truncate">
@@ -44,11 +39,9 @@ export default function LeaderboardRow({ row }) {
         {row.score}
       </span>
 
-      <div className="flex justify-end gap-1">
-        {Array.from({ length: tierStyle.stars }).map((_, i) => (
-          <span key={i}>⭐</span>
-        ))}
-      </div>
+      {/* Stars will come from mastery, which the leaderboard does not send
+          yet; the empty cell keeps the grid aligned with the header. */}
+      <div className="flex justify-end gap-1" />
     </div>
   );
 }
