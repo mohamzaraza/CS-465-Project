@@ -1,4 +1,3 @@
-import React from "react";
 import PillarCard from "./PillarCard";
 
 export default function Pillars({ pillars }) {

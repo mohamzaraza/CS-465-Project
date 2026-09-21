@@ -1,5 +1,4 @@
 // src/pages/About.jsx
-import React from "react";
 import hamzaPhoto from "../assets/hamza.jpg";
 import emiPhoto from "../assets/emi.jpg";
 import kevPhoto from "../assets/kev.jpg";

@@ -1,6 +1,6 @@
 // src/components/dieting/FlipCard.jsx
 
-import React, { useState } from "react";
+import { useState } from "react";
 
 /**
  * Flippable info card styled to match LiftLogic vibes.

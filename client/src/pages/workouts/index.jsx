@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import WorkoutInfoHeader from "../../components/workouts/WorkoutInfoHeader";
 
 export default function WorkoutsHome() {
   return (

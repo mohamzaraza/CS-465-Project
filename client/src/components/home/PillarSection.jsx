@@ -1,4 +1,3 @@
-import React from "react";
 import Pillars from "./Pillars";
 import strengthSymbol from "../../assets/strength-symbol.png";
 import atlas from "../../assets/atlas.png";

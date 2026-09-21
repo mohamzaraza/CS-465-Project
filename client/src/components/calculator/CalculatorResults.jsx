@@ -1,5 +1,4 @@
 // src/components/calculator/CalculatorResults.jsx
-import React from "react";
 
 export default function CalculatorResults({ form, results }) {
   if (!results) return null;

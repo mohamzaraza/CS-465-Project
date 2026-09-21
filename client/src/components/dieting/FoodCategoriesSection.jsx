@@ -1,6 +1,5 @@
 // src/components/dieting/FoodCategoriesSection.jsx
 
-import React from "react";
 import proteinIcon from "../../assets/protein.png";
 import carbsIcon from "../../assets/carbs.png";
 import fatsIcon from "../../assets/fats.png";

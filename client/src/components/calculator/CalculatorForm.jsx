@@ -1,5 +1,4 @@
 // src/components/calculator/CalculatorForm.jsx
-import React from "react";
 
 export default function CalculatorForm({ form, onChange, ageMin, ageMax }) {
   return (

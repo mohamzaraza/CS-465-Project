@@ -1,6 +1,5 @@
 // src/components/dieting/DietTipsMythsSection.jsx
 
-import React from "react";
 import FlipCard from "./FlipCard";
 
 export default function DietTipsMythsSection() {

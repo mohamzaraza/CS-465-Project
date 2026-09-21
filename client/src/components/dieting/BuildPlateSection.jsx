@@ -1,6 +1,6 @@
 // src/components/dieting/BuildPlateSection.jsx
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   FOOD_DATA,
   FOOD_CATEGORIES,

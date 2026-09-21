@@ -11,7 +11,9 @@ Commits:
 | `bb595ec` | One data-driven muscle page replaces 13 copies |
 | `100aed5` | Shared LiftRankForm and leaderboard fixes |
 | `bb8f693` | Server hardening, validation, central error handling, tests |
-| *this commit* | Documentation and change log |
+| `afb58e1` | Documentation and change log |
+| `c1c1e08` | Answer 409, not 500, when a concurrent sign-up takes the email (found in the final review) |
+| *final commit* | Final review, stricter lint rule, dependency audit (section 6) |
 
 ## 1. Problems from the code review and what changed
 
@@ -83,12 +85,62 @@ Commits:
 ## 5. Known issues for me to decide on
 
 - **`bg-hero-greek` is undefined.** `client/src/pages/Welcome.jsx` uses the class, but `tailwind.config.js` defines no `hero-greek` background, so the Welcome page has no background image. This existed before Enhancement 1.
-- **npm audit.** `npm audit` today reports **17 vulnerabilities in `client/`** (2 low, 3 moderate, 12 high) and **5 in `server/`** (1 low, 4 high). Nothing was upgraded, because the rules allow only the dependencies a prompt names.
+- **npm audit.** Resolved in the final review: see section 6. Both packages now report 0 vulnerabilities.
+- **17 unused images (about 5.6 MB).** They were already unreferenced at the baseline: `blackg-marble.jpg`, `buddy.jpg`, `colosseum.png`, `gold-marble.avif`, `laurel.png`, `meal.jpg`, `meal.png`, `scenery.jpg`, `spartan.jpg`, and in `assets/colosseum/`: `Crown.png`, `Helmet.png`, `Helmetg.png`, `Helmetr.png`, `Helmetrr.png`, `Titan.png`, `Warrior.png`, `Warriorr.png`. Kept in case they are planned art.
+- **`server/src/config/muscleMultipliers.js` is imported by nothing.** It is ranking data, so it is left for Enhancement 2.
+- **`NODE_ENV` is documented in the README but not in `server/.env.example`.** The error handler hides 500-level details only when `NODE_ENV=production`. A deployment must set it, or database error text can reach clients.
+- **Sessions from before this branch are dropped once.** The old code stored the token as raw text; `storage.get` now expects JSON, so a pre-upgrade token reads as "not logged in" and the user logs in again.
 - **12 muscles have no exercises.** Shoulders, back, biceps, triceps, forearm, quads, hamstrings, glutes, calves, abs, obliques and lower back all show the "coming soon" state until real content is added.
 - **Chest has an empty tier.** Chest has Newcomer, Warrior and Elite exercises but none for LogicCrafted, so that section is empty.
 - **"QUADS" versus "QUADRICEPS".** The Lower Body page links "QUADS" while the muscle page is titled "QUADRICEPS". Both were kept as they were.
 - **Deployment needs two settings.** A GitHub Pages build must be made with `VITE_API_URL` set, and the hosted server must list the Pages origin in `CLIENT_ORIGIN`. Otherwise the deployed site cannot reach the API.
 
-## 6. How this was made
+## 6. Final review
+
+### Stricter lint rule
+
+`client/eslint.config.js` ignored every unused variable whose name started with a capital letter (`varsIgnorePattern: '^[A-Z_]'`). The pattern existed because core `no-unused-vars` cannot see JSX, so without it every component would have looked unused. As a side effect it also hid genuinely unused component imports, such as the `RankChestPanel` import in `ColosseumGate.jsx` (removed in `bb8f693`).
+
+- `eslint-plugin-react` added as a devDependency, with only `react/jsx-uses-vars` enabled, so JSX usage counts as a use.
+- `varsIgnorePattern` is now `'^_'`: only a deliberate `_name` opts out.
+- Proof: adding an unused `import WorkoutInfoHeader ...` to `pages/workouts/index.jsx` made `npm run lint` fail with `'WorkoutInfoHeader' is defined but never used`. Removing it made lint pass again.
+- The stricter rule found **17 real problems**, all fixed by deleting the import (none silenced):
+  - 16 files imported `React` without using it (React 19's JSX transform does not need it): `CalculatorForm`, `CalculatorResults`, `BuildPlateSection`, `DietBasicsSection`, `DietCTASection`, `DietHeroSection`, `DietTipsMythsSection`, `FlipCard`, `FoodCategoriesSection`, `RevealSection`, `PillarSection`, `Pillars`, `About`, `Calculator`, `Dieting`, `Welcome`.
+  - `pages/workouts/index.jsx` imported `WorkoutInfoHeader` and never rendered it.
+
+### Dependency audit
+
+`npm audit fix` was run without `--force`. No `package.json` range changed and no package crossed a major version. Lint, tests and build pass afterwards.
+
+| Package | Before | After |
+|---|---|---|
+| `client/` | 17 (2 low, 3 moderate, 12 high) | 0 |
+| `server/` | 5 (1 low, 4 high) | 0 |
+
+Adding `eslint-plugin-react` did not change the client count (17 before and after it).
+
+Upgrades worth knowing about:
+- **Client runtime:** `react-router` / `react-router-dom` 7.9.6 → 7.18.4. This is the only shipped client dependency that changed.
+- **Client dev/build:** `vite` 7.2.4 → 7.3.6 (and `esbuild` 0.25 → 0.28, which vite pulls in), `rollup` 4.53 → 4.63, `postcss` 8.5.6 → 8.5.28, and Babel, `minimatch`, `picomatch`, `brace-expansion`, `js-yaml`, `flatted` and `nanoid`.
+- **Server runtime:** `body-parser` 2.2.1 → 2.3.0, `path-to-regexp` 8.3.0 → 8.4.2 (both part of Express 5), `type-is` and `iconv-lite`.
+- **Server dev:** `minimatch`, `picomatch` and `brace-expansion`.
+
+### Extra fix from the review
+
+| Bug | Fix | Files | Verified by |
+|---|---|---|---|
+| Two sign-ups for the same email at once could both pass the "already in use" check. The database's unique constraint then rejected the second one, which reached the user as a 500. | Prisma's unique-violation code `P2002` is answered with the same 409 "Email already in use". | `server/controllers/authController.js` | New `app.test.js` case, which fails with 500 on the old controller and passes on the fixed one |
+
+### Final numbers
+
+| Measure | Value |
+|---|---|
+| Client lint | 0 problems with the stricter rule |
+| Tests | 158 passing (95 client, 63 server) |
+| `npm audit` | 0 vulnerabilities in `client/` and `server/` |
+| Out-of-scope files | `server/src/ranking/*`, `server/prisma/*` and `leaderboardController.js` unchanged since the baseline. `rankingController.js` differs only by the two named constants. The tier anchor `console.log` calls are still present. |
+| Tracked files | 189 files, 81 MB. `ArenaCutscene.mov` alone is 45 MB. |
+
+## 7. How this was made
 
 The changes in this enhancement were implemented by Claude Code (Anthropic) from prompts I wrote. I reviewed each commit before accepting it.

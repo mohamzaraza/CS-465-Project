@@ -1,7 +1,5 @@
 // src/pages/Dieting.jsx
 
-import React from "react";
-
 import DietHeroSection from "../components/dieting/DietHeroSection";
 import DietBasicsSection from "../components/dieting/DietBasicsSection";
 import FoodCategoriesSection from "../components/dieting/FoodCategoriesSection";

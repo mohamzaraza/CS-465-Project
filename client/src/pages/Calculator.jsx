@@ -5,7 +5,7 @@
 //  - UI split into <CalculatorForm /> + <CalculatorResults />
 // ================================================
 
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 
 // Components
 import CalculatorForm from "../components/calculator/CalculatorForm";
