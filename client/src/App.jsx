@@ -55,6 +55,11 @@ import RankChest from "./pages/RankChest";
 export default function App() {
     const { loading } = useAuth();
 
+  // Vite serves the app under the `base` set in vite.config.js ("/CS-465-Project/"),
+  // so the router has to know about that prefix or every route falls through to NotFound.
+  // The trailing slash is stripped because React Router expects "/CS-465-Project", not "/CS-465-Project/".
+  const basename = import.meta.env.BASE_URL.replace(/\/$/, "");
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white">
@@ -64,7 +69,7 @@ export default function App() {
   }
 
   return (
-    <Router>
+    <Router basename={basename}>
       <MainLayout>
         <Routes>
           <Route path="/" element={<Welcome />} />
