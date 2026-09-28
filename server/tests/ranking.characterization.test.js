@@ -365,7 +365,7 @@ describe("ranking golden master under plain Node", () => {
     );
 
     let status = 0;
-    let output = "";
+    let output;
     try {
       output = execFileSync(process.execPath, [script], { encoding: "utf8" });
     } catch (err) {
