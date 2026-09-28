@@ -1,4 +1,4 @@
-\# LiftLogic: CS 499 Enhancement One (software design and engineering)
+\# LiftLogic: CS 499 Enhancement Two (algorithms and data structures)
 
 
 
@@ -10,13 +10,13 @@ Full-stack fitness app. client/ is React 19 + Vite + Tailwind. server/ is Expres
 
 \- client: npm install, npm run dev (http://localhost:5173/), npm run lint, npm run build, npm test (added in Prompt 1)
 
-\- server: npm install, npm run dev, npm test (added in Prompt 5)
+\- server: npm install, npm run dev, npm test (vitest + supertest, no database needed)
 
 
 
 \## Rules
 
-\- Work on the git branch enhancement-1 in small commits. Before each commit run lint, tests and build for what you touched and show me the real output.
+\- Work on the git branch enhancement-2 in small commits. Before each commit run lint, tests and build for what you touched and show me the real output.
 
 \- Never read, print or edit any .env file. Use .env.example files instead. Do not start the real server or connect to a database; none is available. Tests must not need a database or the network.
 
@@ -34,11 +34,17 @@ Full-stack fitness app. client/ is React 19 + Vite + Tailwind. server/ is Expres
 
 
 
-\## Out of scope (planned for later enhancements: do NOT fix or edit)
+\## Out of scope (planned for Enhancement 3: do NOT fix or edit)
 
-\- server/src/ranking/\* and the ranking algorithm, including the missing computeBackTier import in controllers/rankingController.js (Enhancement 2). The only change allowed there is replacing the magic numbers 36e5 and 12 with named constants, when a prompt says so.
+\- prisma/\*, the database schema, migrations, and the leaderboard returning user emails.
 
-\- prisma/\*, the database schema, migrations, and the leaderboard returning user emails (Enhancement 3).
+\- Moving the exercise catalog (client/src/data/exercises.js) into the database.
 
-\- The console.log calls that run at import time in the tier anchor files (they appear in my code review video).
+
+
+\## In scope now (Enhancement 2: algorithms and data structures)
+
+\- server/src/ranking/\*, controllers/rankingController.js and the ranking route wiring, plus tests for them. This includes the missing computeBackTier import, the circular import between the anchor and ranking files, and the import-time console.log calls.
+
+\- Client changes stay minimal and only follow an API contract change.
 
