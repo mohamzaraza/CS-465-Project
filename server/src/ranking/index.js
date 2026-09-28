@@ -26,8 +26,6 @@ export function getRankingEngine(muscle) {
   return engine;
 }
 
-export const RANKABLE_MUSCLES = [...engines.keys()];
-
 /**
  * Rank one muscle's lifts. Throws for a muscle with no configured engine.
  *

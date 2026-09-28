@@ -6,7 +6,7 @@ export const LEADERBOARD_LIMIT = 20;
 // The one place a leaderboard row's public fields are chosen, shared by every
 // leaderboard endpoint. Enhancement 3 removes the email field here, and in no
 // other place.
-export function toLeaderboardRow({ rank, email, tier, score }) {
+function toLeaderboardRow({ rank, email, tier, score }) {
   return { rank, user: email, tier, score };
 }
 
