@@ -149,8 +149,13 @@ function validateConfig(config) {
           `${quote(Object.keys(FORMULAS))}`
       );
     }
-    if (typeof lift.factor !== "number" || !Number.isFinite(lift.factor)) {
-      throw configError(muscle, `lift "${lift.key}" needs a finite factor, got ${lift.factor}`);
+    // Positive for the same reason the multiplier is: a zero or negative factor
+    // would make a heavier lift score the same or lower.
+    if (typeof lift.factor !== "number" || !Number.isFinite(lift.factor) || lift.factor <= 0) {
+      throw configError(
+        muscle,
+        `lift "${lift.key}" needs a positive finite factor, got ${lift.factor}`
+      );
     }
 
     const unknownLiftKeys = Object.keys(lift).filter((key) => !LIFT_KEYS.has(key));

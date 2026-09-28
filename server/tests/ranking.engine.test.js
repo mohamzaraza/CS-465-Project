@@ -415,6 +415,14 @@ describe("createRankingEngine validation", () => {
     expect(() => createRankingEngine(config)).toThrow(/finite factor/);
   });
 
+  // lift_b has no anchor, so the ladder check cannot notice a bad factor on it;
+  // only this check stops a heavier lift_b from scoring lower.
+  it.each([0, -1, -0.5])("throws when a lift factor is %s", (factor) => {
+    const [liftA, liftB] = testConfig().lifts;
+    const config = testConfig({ lifts: [liftA, { ...liftB, factor }] });
+    expect(() => createRankingEngine(config)).toThrow(/positive finite factor/);
+  });
+
   it("throws when a ladder tier has no anchor lifts", () => {
     const config = testConfig({ anchors: { ...testConfig().anchors, Mid: null } });
     expect(() => createRankingEngine(config)).toThrow(/tier "Mid" has no anchor lifts/);
