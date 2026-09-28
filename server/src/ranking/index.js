@@ -28,9 +28,23 @@ export function getRankingEngine(muscle) {
 
 export const RANKABLE_MUSCLES = [...engines.keys()];
 
-/** Rank one muscle's lifts. Throws for a muscle with no configured engine. */
+/**
+ * Rank one muscle's lifts. Throws for a muscle with no configured engine.
+ *
+ * Assumes the lifts already passed validateLifts: rank() is a pure scorer and
+ * will happily score nonsense, which is why every caller validates first.
+ */
 export function rankLifts(muscle, lifts) {
   return getRankingEngine(muscle).rank(lifts);
+}
+
+/**
+ * Check one muscle's submitted lifts against its configured bounds.
+ * Returns { ok: true, lifts } or { ok: false, errors }; never throws for bad
+ * input, only for a muscle with no configured engine.
+ */
+export function validateLifts(muscle, lifts) {
+  return getRankingEngine(muscle).validate(lifts);
 }
 
 const chest = getRankingEngine("chest");

@@ -325,3 +325,183 @@ keeps this commit a pure refactor.
 | `server/tests/ranking.engine.test.js` | Added. `findTier` against a linear-scan reference and at boundaries; every validation failure; a third muscle built from data. |
 | `server/tests/ranking.imports.test.js` | Added. Import-graph cycle detection, plus a self-test of the detector. |
 | `server/tests/app.test.js` | Dead `vi.mock` of the ranking engine removed. |
+
+## Behavior changes (Prompt 3)
+
+Everything above this line was a refactor: the golden master proved that no
+output moved. This section is the opposite. Every change here was approved before
+it was written, and the diff it produced is asserted entry by entry in
+`server/tests/ranking.behavior-changes.test.js`. `ranking-golden.json` (v1) is
+untouched and is never regenerated; `ranking-golden-v2.json` is the fixture the
+engine is now held to.
+
+### What changed, and on whose authority
+
+| Problem | Decision approved | Change | Files | How it was verified |
+|---|---|---|---|---|
+| Chest's Primordial anchor scored 1703.4, **below** Immortal's 2253.2, so the ladder was not increasing at the top. The inversion was invisible because a 1RM override owned the tier and the ladder skipped it. | Option A: keep every tier from Untrained through Immortal exactly as it is; replace the chest Primordial anchor with one that sits above Immortal, chosen by continuing the ladder's own step. | Chest Primordial is now **bench 415x4, incline_db 115x8, cable 55x12 = 2491.6** (gap +238.4 over Immortal, ratio 1.1058). Celestial to Immortal steps +50 lb bench, +10 lb incline_db, +5 lb cable at reps 4/8/12, so Primordial repeats that step once. Back's anchor already scored 5826.0, above Immortal's 5501.4, so **back's anchor did not change**. | `rankingConfig.js` (data only) | `ranking.rounding.test.js` asserts startup validation would now **refuse** the old anchor, naming both tiers. `ranking.behavior-changes.test.js` pins the 140 entries that change tier. |
+| The `bench 1RM >= 415` override ranked a bench-only lifter Primordial, ignoring the other two lifts: bench 401.6032 lb gave Novice, 401.6226 lb gave Primordial - nine tiers for 0.0194 lb. Back had the same rule on `deadlift >= 600`. | Delete the override rule and every line that existed only for it. | Both `override` blocks deleted from the config; the override validation and the `overrideRule` branch in `rank()` deleted from the engine. Primordial joined the ladder (`SCORED_TIERS` is now `slice(1)`), so all 11 scored tiers are searched and validated. A config that re-adds `override` is now a **startup error**, not a silently ignored field. | `rankingConfig.js`, `rankingEngine.js` | `ranking.characterization.test.js` turns each old DEFECT test into its FIXED counterpart. The engine test asserts the resurrected key is refused by name. |
+| The server scored whatever arrived: no required lifts, no bounds. A 99999 lb bench for 99 reps scored 515994.84 and was stored. | Add a validation layer driven by the muscle config; require every configured lift; bound weight per lift and reps globally. | New `server/src/ranking/validateLifts.js`, a pure function returning `{ ok: true, lifts }` or `{ ok: false, errors }` with one message per problem, naming the lift and the field. `rank()` is left as a pure scorer that assumes valid input, which is why every realistic score is still computed exactly as before. | `validateLifts.js`, `rankingEngine.js`, `rankingController.js` | `tests/validateLifts.test.js`: 55 cases covering every rejection, both boundaries of every bound, and a happy path per muscle. |
+| A score was rounded in the controller **after** the tier had been chosen from the unrounded value, so a stored score could not be trusted to re-derive its stored tier. | Round once, in `rank()`, and classify from the rounded value against thresholds rounded the same way. | `rank()` rounds first and returns that integer; thresholds are rounded at startup; `assertStrictlyIncreasing` now runs on the **rounded** ladder and throws naming both tiers if rounding merges two. The controller stores `result.score` directly instead of rounding again. | `rankingEngine.js`, `rankingController.js` | `ranking.rounding.test.js`: a property test over **6000** seeded random valid inputs (3000 per muscle) asserts `findTier(thresholds, result.score)` equals `result.tier`, plus a case proving a config whose anchors collide only after rounding is refused. |
+| `POST /api/rank/back` returned 500 for every request: `rankBack` called `computeBackTier`, which the controller never imported. | Compute and return the result **without saving and without a cooldown**, and say why in the code. | The chest and back handlers are replaced by one `createRankHandler(muscle)` factory driven by a per-muscle table. Back's entry is `saves: null`. The `TODO` and the dead code are gone. | `rankingController.js` | `tests/rankingController.test.js`: 25 supertest cases with `vi.mock` on `lib/prisma.js`. |
+
+### The exact bounds
+
+Stored as data on each lift in `rankingConfig.js`, so a new muscle sets its own
+and nothing in `validateLifts.js` changes.
+
+| Muscle | Lift | Weight (lb) | Reps | Heaviest realistic weight in the fixture |
+|---|---|---|---|---|
+| chest | `bench` | 1 - 1000 | 1 - 30, whole | 500 |
+| chest | `incline_db` | 1 - 300 | 1 - 30, whole | 150 |
+| chest | `cable` | 1 - 300 | 1 - 30, whole | 100 |
+| back | `lat_pulldown` | 1 - 600 | 1 - 30, whole | 300 |
+| back | `db_row` | 1 - 300 | 1 - 30, whole | 150 |
+| back | `deadlift` | 1 - 1500 | 1 - 30, whole | 650 |
+
+Weight may be fractional (half-pound plates are real); reps may not. Each maximum
+is roughly two to three times the heaviest weight the generator produces for that
+lift. They were **not** derived from competition records: no network was available
+and inventing record figures would be worse than admitting that. Their job is to
+refuse the physically impossible, not to judge anyone's training.
+
+Two knock-on effects, both deliberate and both asserted in tests rather than left
+to be discovered:
+
+- **`Untrained` is no longer reachable through the API.** Every lift must be at
+  least 1 lb for 1 rep, so no accepted input can score 0. `Untrained` now means
+  "never ranked" - which is what the client already shows, since it renders no
+  rank box until `GET /rank/chest/me` returns a row.
+- **The `floorTier` defect is still open.** A score below the Recruit anchor is
+  still reported as Recruit rather than Untrained. It was not one of the approved
+  changes, so it was left alone. It is recorded in v2 as
+  `chest-open-floor-tier-below-recruit` (a complete set scoring 81 against a
+  Recruit threshold of 335), and exactly one fixture entry (`back-random-094`,
+  518 against a threshold of 962) still lands on it.
+
+### What the rep cap does and does not fix
+
+The cap closes the *absurd* inputs and nothing more. Said plainly: **the volume
+exploit is reduced, not closed.**
+
+| Input | Before | After |
+|---|---|---|
+| `incline_db` 15 lb x 100 reps, alone | Celestial @ 1980 | **rejected** (reps cap, and two lifts missing) |
+| `bench` 99999 lb x 99 reps, alone | Primordial @ 515994.84 | **rejected** (weight cap, reps cap, two lifts missing) |
+| `incline_db` 15 lb x 30 reps, alone | - | **rejected** - by the *required-lifts* rule, not the cap |
+| `bench` 45x1, `incline_db` 15x30, `cable` 5x1 | - | Novice @ 655 |
+| `bench` 45x30, `incline_db` 15x30, `cable` 5x30 | - | Warrior @ 864 |
+| **`bench` 135x30, `incline_db` 45x30, `cable` 20x30** | - | **Primordial @ 2754** |
+| **back `lat_pulldown` 130x30, `db_row` 65x30, `deadlift` 225x30** | - | **Primordial @ 10539** |
+
+The last two rows are the honest answer: those are the *Heroic* anchor's own
+weights, claimed for 30 reps each, and they reach the top tier. `volume` is
+`weight * reps` with nothing to damp it, so the score is linear in reps right up
+to the cap. Closing this properly means changing the formulas - a rep-range
+decay, or scoring an estimated 1RM only - which would move every tier and was
+explicitly out of scope. Both cases are recorded in v2 as
+`chest-open-rep-cap-does-not-close-volume` and
+`back-open-rep-cap-does-not-close-volume`, with `status: "open"`.
+
+### The back route
+
+`POST /api/rank/back` now answers **200** with `{ muscle, tier, score }` and saves
+nothing. Persisting a back rank would need schema work that belongs to
+Enhancement 3: the cooldown reads `User.lastChestRankAt`, a chest-only column, so
+a saved back rank would either have to share chest's cooldown or wait for a
+per-muscle column. The controller says so at the point where it decides.
+
+Note the shape difference this leaves, which was raised and accepted: chest
+returns the saved Prisma row, whose `tier` is the uppercase enum (`"HEROIC"`),
+while back returns the engine result in title case (`"Heroic"`). Chest's shape is
+frozen by the client contract and was not touched.
+
+### Fixture v2: the diff from v1, by reason
+
+744 v1 entries, all still present; 47 added. Of the 744, every one falls into
+exactly one bucket, and `ranking.behavior-changes.test.js` asserts each count
+against a hard-coded expectation - a computed expectation would agree with
+whatever the code happened to do.
+
+| Reason | Entries |
+|---|---|
+| Now-invalid input | **391** |
+| Demoted from Primordial (was an override promotion) | **81** |
+| Promoted to Primordial (score clears the new anchor) | **59** |
+| Score rounded, tier unchanged | **207** |
+| Unchanged entirely | **2** |
+| Input changed (derived from chest's Primordial anchor) | **4** |
+| **Total** | **744** |
+
+Reading the table:
+
+- **No tier moved for any reason other than the Primordial ladder.** Rounding
+  changed 207 scores and not one tier. That is asserted directly, so if a future
+  change ever tips a score across a threshold it fails loudly.
+- All 207 rounding entries are **exactly** `Math.round` of their v1 score, and the
+  2 unchanged entries (`chest-random-018`, `back-anchor-Primordial`) are the ones
+  whose v1 score was already the rounded value.
+- Of the 391 now-invalid entries, **377 are refused only for missing lifts** and
+  just **10** break a bound at all - of which only **2** exceed a *maximum*
+  (`chest-defect-no-input-bounds` and `chest-defect-unbounded-volume`). The other
+  8 are the zero and negative edge cases. So "every lift is required" is the
+  load-bearing rule; the bounds refuse almost nothing the fixture contains, which
+  is exactly what generous limits are supposed to do.
+- The 4 input-changed entries are `chest-anchor-Primordial`,
+  `chest-threshold-Primordial-below`, `chest-threshold-Primordial-above` and
+  `chest-defect-anchors-not-monotonic` - all built *from* the anchor that moved.
+  They are declared in the fixture as `inputsChangedSinceV1`, and the test asserts
+  no other entry's input changed, so an output change cannot hide as an input
+  change.
+
+The 47 added entries are 44 `-rounded-` threshold probes (11 tiers x 2 sides x 2
+muscles) and 3 `-open-` defect entries. The probes are new because v1's threshold
+probes were all single-lift and are now refused, which recorded a rejection but
+pinned nothing about where a tier begins. The new probes are complete lift sets
+solved to land exactly **on** a rounded threshold and 0.51 **below** it - 0.51
+rather than 0.01 because the boundary moved: the first score that misses tier N is
+now N - 0.51, since N - 0.01 rounds back up into the tier.
+
+### Scripts
+
+`npm run ranking:golden` now writes **`ranking-golden-v2.json`** and no longer
+writes v1. `npm run ranking:check` replays v2, including every recorded rejection
+message, and additionally asserts that every accepted score is a whole number and
+that the rounded ladder strictly increases. `npm run bench:ranking` deliberately
+still reads v1 - it uses the fixture only as a source of *inputs*, and timing the
+same inputs is what keeps its numbers comparable with the baseline above.
+
+### Files in this commit
+
+| File | Change |
+|---|---|
+| `server/src/ranking/validateLifts.js` | Added. Pure, config-driven input validation; reports every problem, never throws. |
+| `server/src/ranking/rankingConfig.js` | Per-lift `bounds` added; chest's Primordial anchor replaced; both `override` blocks deleted; `SCORED_TIERS` now includes Primordial. |
+| `server/src/ranking/rankingEngine.js` | Override support deleted. Bounds validated at startup; unknown config and lift keys refused; thresholds rounded; `rank()` rounds once and classifies from the rounded score; engines expose `validate`. |
+| `server/src/ranking/index.js` | `validateLifts(muscle, lifts)` added; `rankLifts` documented as assuming valid input. |
+| `server/controllers/rankingController.js` | Both handlers replaced by one `createRankHandler(muscle)` factory. Validation before the cooldown read; 400 with `{ error, errors }`; back computes without saving; `TODO` and dead code removed. |
+| `server/routes/rankingRoutes.js` | Unchanged - the export names and the `asyncHandler` wrapping are the same. |
+| `server/scripts/generate-ranking-golden.mjs` | Writes v2; records rejections; new `-rounded-` probe group; defect entries carry `status` and `resolution`; fixture records `thresholds`, `bounds` and `inputsChangedSinceV1`. |
+| `server/scripts/check-ranking-golden.mjs` | Replays v2, checks rejection messages, integer scores and the rounded ladder. |
+| `server/scripts/benchmark-ranking.mjs` | Comment only, explaining why it still reads v1. |
+| `server/tests/fixtures/ranking-golden-v2.json` | Added. 782 cases + 9 known defects. |
+| `server/tests/fixtures/ranking-golden.json` | **Untouched.** Kept as the v1 baseline. |
+| `server/tests/ranking.behavior-changes.test.js` | Added. Holds v1 and v2 side by side and asserts the changed set is exactly the approved one. |
+| `server/tests/validateLifts.test.js` | Added. Every rejection, both boundaries, both muscles. |
+| `server/tests/ranking.rounding.test.js` | Added. The 6000-input property test, the rounding boundary, and the rounded-ladder startup validation. |
+| `server/tests/rankingController.test.js` | Added. Chest's contract, the cooldown, 400, 401, 500, and the working back route. |
+| `server/tests/ranking.characterization.test.js` | Retargeted at v2; each fixed DEFECT test replaced by its FIXED counterpart; the two open defects kept as open. |
+| `server/tests/ranking.fixture-exact.test.js` | Retargeted at v2; rejection messages asserted bit-for-bit alongside scores. |
+| `server/tests/ranking.imports.test.js` | Import graph updated for `validateLifts.js`. |
+| `server/tests/ranking.engine.test.js` | Override tests removed with the feature; bounds-validation and unknown-key tests added; ladder length 10 to 11. |
+| `client/**` | **No change.** The chest contract did not move, and the 400 body only gained a field. See the note below. |
+
+### One thing the client will now see
+
+`client/src/components/colosseum/LiftRankForm.jsx` validates weight above 0 and
+reps as a whole number above 0, with no upper limit. A user who enters 40 reps, or
+a 2000 lb bench, will now pass the client's check and get a 400 from the server
+with a clear message instead of a rank. Nothing breaks - `apiRequest` surfaces the
+`error` string, and the form already shows it in its `role="alert"` - but the
+client's limits and the server's no longer agree. Bringing them into line is a
+client change, and this prompt's scope was the server, so it was not made.

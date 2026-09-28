@@ -1,5 +1,10 @@
-// Replays tests/fixtures/ranking-golden.json against the live ranking engines
+// Replays tests/fixtures/ranking-golden-v2.json against the live ranking engines
 // and exits non-zero on any mismatch.
+//
+// It used to replay ranking-golden.json (v1). Prompt 3 changed behavior on
+// purpose, so v1 is no longer reproducible and is kept only as history; v2 is the
+// fixture the engine is now held to. ranking.behavior-changes.test.js is what
+// proves the step from one to the other was exactly the approved one.
 //
 // This duplicates what tests/ranking.characterization.test.js asserts, on
 // purpose: it replays the fixture under plain Node's module and number
@@ -10,11 +15,10 @@
 
 import { readFileSync } from "node:fs";
 
-import { computeBackTier, computeChestTier } from "../src/ranking/index.js";
+import { computeBackTier, computeChestTier, validateLifts } from "../src/ranking/index.js";
 
-// The fixture stores full double precision, so the only slack needed is for
-// a future Node version rounding a transcendental differently. Scores here are
-// products and sums of doubles, which are exactly reproducible in practice.
+// Scores are now whole numbers, so this is exact equality in practice. The
+// tolerance stays for the anchor scores below, which are still raw doubles.
 const SCORE_TOLERANCE = 1e-9;
 
 const computeTier = { chest: computeChestTier, back: computeBackTier };
@@ -25,7 +29,7 @@ function scoresMatch(actual, expected) {
   return Math.abs(actual - expected) <= SCORE_TOLERANCE * Math.max(1, Math.abs(expected));
 }
 
-const fixtureUrl = new URL("../tests/fixtures/ranking-golden.json", import.meta.url);
+const fixtureUrl = new URL("../tests/fixtures/ranking-golden-v2.json", import.meta.url);
 const fixture = JSON.parse(readFileSync(fixtureUrl, "utf8"));
 
 const entries = [...fixture.cases, ...fixture.knownDefects];
@@ -38,7 +42,35 @@ for (const entry of entries) {
     continue;
   }
 
-  const result = compute(entry.lifts);
+  const checked = validateLifts(entry.muscle, entry.lifts);
+
+  // An entry records exactly one outcome. Checking the rejections matters as
+  // much as checking the scores: they are the inputs Prompt 3 decided the server
+  // must refuse, and nothing else in plain Node would notice them coming back.
+  if (entry.rejected) {
+    if (checked.ok) {
+      mismatches.push(
+        `${entry.id}: expected rejection (${entry.rejected.errors.join(" ")}), but the input ` +
+          `was accepted (lifts ${JSON.stringify(entry.lifts)})`
+      );
+    } else if (checked.errors.join("\n") !== entry.rejected.errors.join("\n")) {
+      mismatches.push(
+        `${entry.id}: rejection messages changed\n      expected: ` +
+          `${JSON.stringify(entry.rejected.errors)}\n      actual:   ${JSON.stringify(checked.errors)}`
+      );
+    }
+    continue;
+  }
+
+  if (!checked.ok) {
+    mismatches.push(
+      `${entry.id}: expected tier "${entry.expected.tier}", but the input is now rejected ` +
+        `(${checked.errors.join(" ")})`
+    );
+    continue;
+  }
+
+  const result = compute(checked.lifts);
 
   if (result.muscle !== entry.muscle) {
     mismatches.push(
@@ -57,6 +89,10 @@ for (const entry of entries) {
         `(lifts ${JSON.stringify(entry.lifts)})`
     );
   }
+  // The claim Enhancement 3 will rely on: a stored score re-derives its tier.
+  if (!Number.isInteger(result.score)) {
+    mismatches.push(`${entry.id}: score ${result.score} is not a whole number`);
+  }
 }
 
 // The engines do not export their anchor scorer, so re-derive it the way they
@@ -67,16 +103,35 @@ function anchorScoreFor(muscle, tier) {
   return computeTier[muscle](entry.lifts).score;
 }
 
-// Anchor scores are recorded separately from the cases, and a refactor could
-// keep every case green while quietly moving an anchor, so check them too.
+// Anchor scores are recorded separately from the cases, and a change could keep
+// every case green while quietly moving an anchor, so check them too. The
+// recorded value is the raw double; what rank() compares against is that value
+// rounded, which is what `thresholds` holds.
 for (const [muscle, tiers] of Object.entries(fixture.anchorScores)) {
   for (const [tier, expected] of Object.entries(tiers)) {
     const actual = anchorScoreFor(muscle, tier);
-    if (!scoresMatch(actual, expected)) {
+    if (!scoresMatch(actual, Math.round(expected))) {
       mismatches.push(
-        `anchor ${muscle}/${tier}: score expected ${expected}, got ${actual}`
+        `anchor ${muscle}/${tier}: score expected ${Math.round(expected)} (raw ${expected}), ` +
+          `got ${actual}`
       );
     }
+  }
+}
+
+for (const [muscle, tiers] of Object.entries(fixture.thresholds)) {
+  let previous = null;
+  for (const [tier, min] of Object.entries(tiers)) {
+    if (!Number.isInteger(min)) {
+      mismatches.push(`threshold ${muscle}/${tier}: ${min} is not a whole number`);
+    }
+    if (previous !== null && !(min > previous.min)) {
+      mismatches.push(
+        `threshold ${muscle}/${tier}: ${min} does not exceed "${previous.tier}" (${previous.min}); ` +
+          "the ladder must strictly increase after rounding"
+      );
+    }
+    previous = { tier, min };
   }
 }
 
@@ -93,7 +148,9 @@ if (mismatches.length > 0) {
   process.exit(1);
 }
 
+const rejected = entries.filter((entry) => entry.rejected).length;
 console.log(
   `Ranking golden master OK: ${entries.length} fixture entries reproduced ` +
-    `(${fixture.cases.length} cases, ${fixture.knownDefects.length} known defects).`
+    `(${fixture.cases.length} cases, ${fixture.knownDefects.length} known defects, ` +
+    `${rejected} of them rejected as invalid input).`
 );

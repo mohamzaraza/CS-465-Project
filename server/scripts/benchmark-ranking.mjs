@@ -15,6 +15,11 @@ const WARMUP_PASSES = 200; // let the JIT settle before anything is recorded
 const TIMED_RUNS = 7; // odd, so the median is a real sample
 const PASSES_PER_RUN = 200; // one pass = every fixture input for that muscle
 
+// Deliberately still the v1 fixture, even though the engine is now held to v2:
+// only the INPUTS are read here, and timing the same inputs is what keeps these
+// numbers comparable with the baseline recorded before Enhancement 2. Prompt 3
+// made many of them invalid input, which does not matter — rank() is a pure
+// scorer and this measures the scorer.
 const fixtureUrl = new URL("../tests/fixtures/ranking-golden.json", import.meta.url);
 const fixture = JSON.parse(readFileSync(fixtureUrl, "utf8"));
 

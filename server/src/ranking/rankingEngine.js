@@ -8,10 +8,35 @@
 //   - the tier lookup is a binary search over that sorted ladder instead of a
 //     linear scan that rescored every anchor as it went.
 //
-// What deliberately did NOT change: the arithmetic, its order, and every
-// documented defect. server/tests/fixtures/ranking-golden.json pins all of it.
+// The arithmetic and its order are still untouched, so a realistic set scores
+// the same double it always did. What Prompt 3 changed on purpose:
+//   - the 1RM override rule is gone, along with the code that served it, so
+//     every tier including Primordial is reached by score alone;
+//   - a score is rounded to a whole number ONCE, and the tier is classified from
+//     that integer against integer thresholds, so the stored score always
+//     re-derives the stored tier;
+//   - rank() no longer decides what legal input is; validateLifts does.
+// ranking-golden-v2.json pins the result, and ranking.behavior-changes.test.js
+// pins the exact difference from v1.
 
 import { FORMULAS } from "./formulas.js";
+import { validateLifts } from "./validateLifts.js";
+
+// Every key a config may carry. Listed so a typo, or a rule someone brings back
+// after it was deliberately deleted (the old `override`), is a startup error
+// instead of a field the engine silently ignores.
+const CONFIG_KEYS = new Set([
+  "muscle",
+  "multiplier",
+  "lifts",
+  "tierOrder",
+  "zeroTier",
+  "floorTier",
+  "ladder",
+  "anchors",
+]);
+
+const LIFT_KEYS = new Set(["key", "formula", "factor", "bounds"]);
 
 function configError(muscle, message) {
   return new Error(`ranking config for "${muscle}": ${message}`);
@@ -33,16 +58,76 @@ function quote(values) {
   return values.map((value) => `"${value}"`).join(", ");
 }
 
+// The bounds are what validateLifts enforces on every request, so a config that
+// ships nonsense here (a max below the min, a fractional rep cap) would reject
+// legitimate input for as long as nobody noticed. Checked at startup instead.
+function validateBounds(muscle, lift) {
+  const { bounds } = lift;
+
+  if (!bounds || typeof bounds !== "object") {
+    throw configError(muscle, `lift "${lift.key}" needs input bounds for weight and reps`);
+  }
+
+  for (const field of ["weight", "reps"]) {
+    const limits = bounds[field];
+    if (!limits || typeof limits !== "object") {
+      throw configError(muscle, `lift "${lift.key}" needs ${field} bounds with a min and a max`);
+    }
+    for (const edge of ["min", "max"]) {
+      const value = limits[edge];
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        throw configError(
+          muscle,
+          `lift "${lift.key}" needs a finite ${field} ${edge}, got ${value}`
+        );
+      }
+    }
+    if (limits.min > limits.max) {
+      throw configError(
+        muscle,
+        `lift "${lift.key}" has a ${field} min of ${limits.min} above its max of ${limits.max}`
+      );
+    }
+    // A non-positive minimum would let a 0 lb lift through, and the zero-tier
+    // escape hatch then reports Untrained for what looks like a real attempt.
+    if (limits.min <= 0) {
+      throw configError(
+        muscle,
+        `lift "${lift.key}" needs a ${field} min above 0, got ${limits.min}`
+      );
+    }
+  }
+
+  // Reps are counted, not measured: a fractional bound could only ever be a
+  // mistake, and validateLifts already refuses fractional reps.
+  for (const edge of ["min", "max"]) {
+    if (!Number.isInteger(bounds.reps[edge])) {
+      throw configError(
+        muscle,
+        `lift "${lift.key}" needs a whole-number reps ${edge}, got ${bounds.reps[edge]}`
+      );
+    }
+  }
+}
+
 function validateConfig(config) {
   if (!config || typeof config !== "object") {
     throw new Error("ranking config: expected an object");
   }
 
-  const { muscle, multiplier, lifts, tierOrder, ladder, anchors, zeroTier, floorTier, override } =
-    config;
+  const { muscle, multiplier, lifts, tierOrder, ladder, anchors, zeroTier, floorTier } = config;
 
   if (typeof muscle !== "string" || muscle === "") {
     throw new Error('ranking config: "muscle" must be a non-empty string');
+  }
+
+  const unknownKeys = Object.keys(config).filter((key) => !CONFIG_KEYS.has(key));
+  if (unknownKeys.length > 0) {
+    throw configError(
+      muscle,
+      `unknown config key(s) ${quote(unknownKeys)}; a config may only set ` +
+        `${quote([...CONFIG_KEYS])}`
+    );
   }
 
   if (typeof multiplier !== "number" || !Number.isFinite(multiplier) || multiplier <= 0) {
@@ -67,6 +152,17 @@ function validateConfig(config) {
     if (typeof lift.factor !== "number" || !Number.isFinite(lift.factor)) {
       throw configError(muscle, `lift "${lift.key}" needs a finite factor, got ${lift.factor}`);
     }
+
+    const unknownLiftKeys = Object.keys(lift).filter((key) => !LIFT_KEYS.has(key));
+    if (unknownLiftKeys.length > 0) {
+      throw configError(
+        muscle,
+        `lift "${lift.key}" sets unknown key(s) ${quote(unknownLiftKeys)}; a lift may only set ` +
+          `${quote([...LIFT_KEYS])}`
+      );
+    }
+
+    validateBounds(muscle, lift);
   }
 
   const duplicateLifts = duplicates(lifts.map((lift) => lift.key));
@@ -118,29 +214,10 @@ function validateConfig(config) {
     }
   }
 
-  if (override !== undefined) {
-    if (!rankOf.has(override.tier)) {
-      throw configError(muscle, `override tier "${override.tier}" is missing from tierOrder`);
-    }
-    if (!Object.hasOwn(FORMULAS, override.formula)) {
-      throw configError(
-        muscle,
-        `override names unknown formula "${override.formula}"; known formulas are ` +
-          `${quote(Object.keys(FORMULAS))}`
-      );
-    }
-    if (!lifts.some((lift) => lift.key === override.lift)) {
-      throw configError(muscle, `override reads unknown lift "${override.lift}"`);
-    }
-    if (typeof override.min !== "number" || !Number.isFinite(override.min)) {
-      throw configError(muscle, `override needs a finite min, got ${override.min}`);
-    }
-  }
-
   // Every named tier has to be reachable, or it is a typo dressed up as a
-  // feature. The three ways out of rank() are the zero tier, the ladder, and
-  // the override tier.
-  const reachable = new Set([...ladder, zeroTier, override?.tier]);
+  // feature. Since the override was deleted there are only two ways out of
+  // rank(): the zero tier and the ladder.
+  const reachable = new Set([...ladder, zeroTier]);
   const unreachable = tierOrder.filter((tier) => !reachable.has(tier));
   if (unreachable.length > 0) {
     throw configError(
@@ -160,22 +237,26 @@ function validateConfig(config) {
     if (!anchor || typeof anchor !== "object") {
       throw configError(muscle, `ladder tier "${tier}" has no anchor lifts`);
     }
-    const unknownKeys = Object.keys(anchor).filter((key) => !liftKeys.has(key));
-    if (unknownKeys.length > 0) {
+    const unknownAnchorKeys = Object.keys(anchor).filter((key) => !liftKeys.has(key));
+    if (unknownAnchorKeys.length > 0) {
       throw configError(
         muscle,
-        `anchor for tier "${tier}" uses unknown lift key(s) ${quote(unknownKeys)}; this muscle ` +
-          `scores ${quote([...liftKeys])}`
+        `anchor for tier "${tier}" uses unknown lift key(s) ${quote(unknownAnchorKeys)}; this ` +
+          `muscle scores ${quote([...liftKeys])}`
       );
     }
   }
 }
 
-// The ladder deliberately excludes the override tier, so an override anchor that
-// scores out of order cannot trip this. That is not a loophole, it is the point:
-// chest's Primordial anchor scores 1703.4, below Immortal's 2253.2, and it is
-// dead data because Primordial is reached by a 1RM check rather than by score.
-// Were it in the ladder, this check would (correctly) refuse to start.
+// Every tier is now in the ladder, so this check covers all of them — including
+// Primordial, which used to sit outside it and hide the fact that chest's
+// Primordial anchor scored 1703.4, below Immortal's 2253.2. With the approved
+// anchor (2491.6) both muscles pass, and if anyone lowers it again the server
+// refuses to start instead of misranking a user.
+//
+// The comparison is on the ROUNDED thresholds, because rank() classifies a
+// rounded score: two anchors 0.3 apart would be strictly increasing as doubles
+// and identical as integers, which would make one of the tiers unreachable.
 function assertStrictlyIncreasing(muscle, thresholds) {
   for (let i = 1; i < thresholds.length; i += 1) {
     const previous = thresholds[i - 1];
@@ -183,8 +264,8 @@ function assertStrictlyIncreasing(muscle, thresholds) {
     if (!(current.min > previous.min)) {
       throw configError(
         muscle,
-        `ladder anchor scores must strictly increase, but "${current.tier}" scores ` +
-          `${current.min} and "${previous.tier}" scores ${previous.min}`
+        `ladder anchor scores must strictly increase after rounding, but "${current.tier}" ` +
+          `scores ${current.min} and "${previous.tier}" scores ${previous.min}`
       );
     }
   }
@@ -219,7 +300,7 @@ export function findTier(thresholds, score, floorTier) {
 export function createRankingEngine(config) {
   validateConfig(config);
 
-  const { muscle, multiplier, zeroTier, floorTier, override } = config;
+  const { muscle, multiplier, zeroTier, floorTier } = config;
 
   // Resolved once so rank() never does a lookup by name.
   const terms = config.lifts.map((lift) => ({
@@ -247,39 +328,40 @@ export function createRankingEngine(config) {
   // The work that used to happen 10 times per request now happens once per
   // process. Ladder order is tierOrder order, and the scores are asserted
   // increasing along it, so this array is already sorted ascending by min.
+  //
+  // Rounded here, once, for the same reason rank() rounds once: a threshold has
+  // to be comparable to the integer that actually gets stored. Anything else
+  // means a score can be saved under one tier and re-derive another.
   const thresholds = config.ladder.map((tier) =>
-    Object.freeze({ tier, min: score(config.anchors[tier]) })
+    Object.freeze({ tier, min: Math.round(score(config.anchors[tier])) })
   );
   assertStrictlyIncreasing(muscle, thresholds);
   Object.freeze(thresholds);
 
-  const overrideRule = override
-    ? { ...override, compute: FORMULAS[override.formula] }
-    : null;
-
   function rank(lifts) {
-    const total = score(lifts);
+    // Rounded before anything is decided, so the tier below and the score
+    // returned cannot disagree. The database column is an integer, so this
+    // rounding was always happening — it just used to happen in the controller,
+    // after the tier had already been chosen from the unrounded value.
+    const total = Math.round(score(lifts));
 
     // Kept ahead of everything else, as in the original: a non-positive or NaN
-    // score returns a hard 0, not the computed value.
+    // score returns a hard 0, not the computed value. Unreachable through the
+    // API now that every lift must be at least 1 lb for 1 rep, so this is the
+    // answer for a direct engine call only.
     if (!total || total <= 0) {
       return { muscle, tier: zeroTier, score: 0 };
     }
 
-    const tier = findTier(thresholds, total, floorTier);
-
-    // Checked after the ladder, matching the original order. The override reads
-    // the lift's UNFACTORED formula result, which is why back's 0.45 deadlift
-    // factor does not apply here.
-    if (overrideRule) {
-      const entry = lifts[overrideRule.lift];
-      if (entry && overrideRule.compute(entry.weight, entry.reps) >= overrideRule.min) {
-        return { muscle, tier: overrideRule.tier, score: total };
-      }
-    }
-
-    return { muscle, tier, score: total };
+    return { muscle, tier: findTier(thresholds, total, floorTier), score: total };
   }
 
-  return { muscle, rank, score, thresholds };
+  return {
+    muscle,
+    rank,
+    score,
+    thresholds,
+    /** Check submitted lifts against this muscle's own configured bounds. */
+    validate: (lifts) => validateLifts(config, lifts),
+  };
 }

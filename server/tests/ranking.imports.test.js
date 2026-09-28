@@ -153,6 +153,7 @@ describe("server/src/ranking has no import cycle", () => {
       "index.js",
       "rankingConfig.js",
       "rankingEngine.js",
+      "validateLifts.js",
     ]);
   });
 
@@ -162,7 +163,10 @@ describe("server/src/ranking has no import cycle", () => {
       "index.js": ["rankingConfig.js", "rankingEngine.js"],
       // Pure data: importing nothing is what made the cycle impossible.
       "rankingConfig.js": [],
-      "rankingEngine.js": ["formulas.js"],
+      "rankingEngine.js": ["formulas.js", "validateLifts.js"],
+      // Added in Prompt 3, and a leaf for the same reason rankingConfig.js is:
+      // it is handed the config it works from rather than importing it.
+      "validateLifts.js": [],
     });
   });
 

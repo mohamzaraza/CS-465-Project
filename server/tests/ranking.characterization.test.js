@@ -13,19 +13,21 @@ import {
   computeChestScore,
   computeChestTier,
   getRankingEngine,
+  validateLifts,
 } from "../src/ranking/index.js";
 
-// These tests characterize the engines as they behave TODAY. Several recorded
-// outputs are wrong; the "known defects" block names them. Nothing here should
-// be edited to make a future change pass — a failure means behavior moved, and
-// the move has to be deliberate.
+// These tests characterize the engines as they behave TODAY, against the v2
+// fixture. Some recorded outputs are still wrong; the "known defects" block names
+// them and says which ones Prompt 3 closed. Nothing here should be edited to make
+// a future change pass — a failure means behavior moved, and the move has to be
+// deliberate.
 
 const fixture = JSON.parse(
-  readFileSync(new URL("./fixtures/ranking-golden.json", import.meta.url), "utf8")
+  readFileSync(new URL("./fixtures/ranking-golden-v2.json", import.meta.url), "utf8")
 );
 
-// Scores are products and sums of doubles, so they reproduce exactly; the
-// tolerance only guards against a future Node rounding difference.
+// Scores are whole numbers now, so this is exact equality; the tolerance is kept
+// for the raw anchor scores, which are still doubles.
 const SCORE_PRECISION = 6;
 
 const computeTier = { chest: computeChestTier, back: computeBackTier };
@@ -60,7 +62,18 @@ const MID_CHEST_SET = {
 };
 
 function expectMatchesFixture(entry) {
-  const result = computeTier[entry.muscle](entry.lifts);
+  const checked = validateLifts(entry.muscle, entry.lifts);
+
+  // An entry records a score or a refusal, never both.
+  if (entry.rejected) {
+    expect(checked.ok, `${entry.id} should be rejected`).toBe(false);
+    expect(checked.errors, `${entry.id} rejection`).toEqual(entry.rejected.errors);
+    return;
+  }
+
+  expect(checked.ok, `${entry.id} should be accepted: ${checked.errors?.join(" ")}`).toBe(true);
+
+  const result = computeTier[entry.muscle](checked.lifts);
   expect(result.muscle, `${entry.id} muscle`).toBe(entry.muscle);
   expect(result.tier, `${entry.id} tier (lifts ${JSON.stringify(entry.lifts)})`).toBe(
     entry.expected.tier
@@ -86,15 +99,28 @@ describe("ranking golden master", () => {
     for (const entry of entries) expectMatchesFixture(entry);
   });
 
-  it("reaches every tier for both muscles", () => {
+  it("reaches every scored tier for both muscles", () => {
     for (const [muscle, tiers] of [
       ["chest", CHEST_TIERS_IN_ORDER],
       ["back", BACK_TIERS_IN_ORDER],
     ]) {
       const reached = new Set(
-        fixture.cases.filter((c) => c.muscle === muscle).map((c) => c.expected.tier)
+        fixture.cases
+          .filter((c) => c.muscle === muscle && c.expected)
+          .map((c) => c.expected.tier)
       );
-      for (const tier of tiers) expect(reached, `${muscle} ${tier}`).toContain(tier);
+
+      // Primordial is in this list for the first time: v1 could only reach it
+      // through the 1RM override, which the ladder excluded.
+      for (const tier of tiers) {
+        if (tier === "Untrained") continue;
+        expect(reached, `${muscle} ${tier}`).toContain(tier);
+      }
+
+      // The knock-on of the input bounds, asserted rather than left implicit:
+      // every lift must be at least 1 lb for 1 rep, so no accepted input can
+      // score 0, and Untrained now means "never ranked" rather than a result.
+      expect(reached, `${muscle} Untrained`).not.toContain("Untrained");
     }
   });
 
@@ -106,10 +132,11 @@ describe("ranking golden master", () => {
           expect(score, `${muscle} ${tier} has no anchor lifts`).toBe(0);
           continue;
         }
+        // The recorded value is the raw double; rank() returns it rounded.
         expect(
           computeTier[muscle](anchorCase.lifts).score,
           `${muscle} ${tier} anchor`
-        ).toBeCloseTo(score, SCORE_PRECISION);
+        ).toBeCloseTo(Math.round(score), SCORE_PRECISION);
       }
     }
   });
@@ -119,7 +146,7 @@ describe("ranking known values (measured before Enhancement 2)", () => {
   it("scores a mid-level chest set as Novice", () => {
     const result = computeChestTier(MID_CHEST_SET);
     expect(result.tier).toBe("Novice");
-    expect(result.score).toBeCloseTo(538, SCORE_PRECISION);
+    expect(result.score).toBe(538);
   });
 
   it("scores a stronger chest set as Heroic", () => {
@@ -129,7 +156,10 @@ describe("ranking known values (measured before Enhancement 2)", () => {
       cable: { weight: 20, reps: 12 },
     });
     expect(result.tier).toBe("Heroic");
-    expect(result.score).toBeCloseTo(939.6, SCORE_PRECISION);
+    // 939.6 before Prompt 3, which stored 940 anyway: the controller rounded
+    // after the tier had been chosen. The engine now rounds first.
+    expect(result.score).toBe(940);
+    expect(computeChestScore(CHEST_TIER_ANCHORS.Heroic)).toBeCloseTo(939.6, SCORE_PRECISION);
   });
 
   it("returns the full tier list in rank order for both muscles", () => {
@@ -144,70 +174,137 @@ describe("ranking known defects (recorded, not endorsed)", () => {
     for (const entry of fixture.knownDefects) expectMatchesFixture(entry);
   });
 
-  it("DEFECT: a score below the Recruit anchor still reports Recruit", () => {
-    const result = computeChestTier({ incline_db: { weight: 15, reps: 8 } });
+  it("records a status for every defect, and agrees with the outcome", () => {
+    for (const entry of fixture.knownDefects) {
+      expect(["fixed", "reduced", "open"], entry.id).toContain(entry.status);
+      expect(entry.resolution, entry.id).toBeTruthy();
+    }
+    // Four of the six v1 defects are closed; the two that are not are the floor
+    // tier and the volume formula, both deliberately left for later.
+    const byStatus = fixture.knownDefects.reduce((counts, entry) => {
+      counts[entry.status] = (counts[entry.status] ?? 0) + 1;
+      return counts;
+    }, {});
+    expect(byStatus).toEqual({ fixed: 4, reduced: 1, open: 4 });
+  });
+
+  it("STILL OPEN: a score below the Recruit anchor is reported as Recruit", () => {
+    // v1 showed this with incline_db alone, which is refused now. Same defect,
+    // shown with a complete set: three lifts at the lightest legal weight.
+    const result = computeChestTier({
+      bench: { weight: 45, reps: 1 },
+      incline_db: { weight: 15, reps: 1 },
+      cable: { weight: 5, reps: 1 },
+    });
     expect(result.tier).toBe("Recruit");
-    expect(result.score).toBeCloseTo(158.4, SCORE_PRECISION);
+    expect(result.score).toBe(81);
     // The whole point: the score does not reach the tier it is reported as.
-    expect(result.score).toBeLessThan(fixture.anchorScores.chest.Recruit);
+    expect(result.score).toBeLessThan(fixture.thresholds.chest.Recruit);
   });
 
-  it("DEFECT: unbounded reps let 15 lb dumbbells reach Celestial", () => {
-    const result = computeChestTier({ incline_db: { weight: 15, reps: 100 } });
-    expect(result.tier).toBe("Celestial");
-    expect(result.score).toBeCloseTo(1980, SCORE_PRECISION);
-  });
-
-  it("DEFECT: the chest Primordial override ignores the score", () => {
-    const result = computeChestTier({ bench: { weight: 415, reps: 1 } });
+  it("STILL OPEN: the rep cap reduces the volume exploit without closing it", () => {
+    // 100 reps is refused now, but 30 is not, and volume is linear in reps. The
+    // Heroic anchor's own weights, claimed for 30 reps each, reach the top tier.
+    const result = computeChestTier({
+      bench: { weight: 135, reps: 30 },
+      incline_db: { weight: 45, reps: 30 },
+      cable: { weight: 20, reps: 30 },
+    });
     expect(result.tier).toBe("Primordial");
-    expect(result.score).toBeCloseTo(514.6, SCORE_PRECISION);
-    expect(result.score).toBeLessThan(fixture.anchorScores.chest.Warrior);
+    expect(result.score).toBe(2754);
+    expect(result.score).toBeGreaterThan(fixture.thresholds.chest.Primordial);
   });
 
-  it("DEFECT: the back Primordial override ignores the score too", () => {
-    const result = computeBackTier({ deadlift: { weight: 600, reps: 1 } });
-    expect(result.tier).toBe("Primordial");
-    expect(result.score).toBeCloseTo(334.8, SCORE_PRECISION);
-    expect(result.score).toBeLessThan(fixture.anchorScores.back.Recruit);
+  it("FIXED: the input that used to reach Celestial on 15 lb dumbbells is refused", () => {
+    expect(validateLifts("chest", { incline_db: { weight: 15, reps: 100 } })).toMatchObject({
+      ok: false,
+    });
   });
 
-  it("DEFECT: nothing bounds the weight or rep count", () => {
-    const result = computeChestTier({ bench: { weight: 99999, reps: 99 } });
-    expect(result.tier).toBe("Primordial");
-    expect(result.score).toBeGreaterThan(515000);
-    expect(result.score).toBeCloseTo(515994.84, SCORE_PRECISION);
+  it("FIXED: the chest Primordial override is gone", () => {
+    // v1: Primordial, on a score of 514.6, below the Warrior anchor. Now the
+    // input is refused outright, and 415 lb of bench is just a heavy bench.
+    expect(validateLifts("chest", { bench: { weight: 415, reps: 1 } }).ok).toBe(false);
+
+    // With a complete set at the same bench, the score decides, and it is not
+    // Primordial.
+    const result = computeChestTier({
+      bench: { weight: 415, reps: 1 },
+      incline_db: { weight: 15, reps: 1 },
+      cable: { weight: 5, reps: 1 },
+    });
+    expect(result.tier).toBe("Novice");
+    expect(result.score).toBeLessThan(fixture.thresholds.chest.Warrior);
   });
 
-  it("DEFECT: chest anchor scores are not strictly increasing", () => {
-    expect(CHEST_TIER_SCORES.Primordial).toBeLessThan(CHEST_TIER_SCORES.Immortal);
-    // Back happens to be ordered correctly, which is why only chest misranks.
+  it("FIXED: the back Primordial override is gone too", () => {
+    expect(validateLifts("back", { deadlift: { weight: 600, reps: 1 } }).ok).toBe(false);
+
+    const result = computeBackTier({
+      lat_pulldown: { weight: 40, reps: 8 },
+      db_row: { weight: 20, reps: 10 },
+      deadlift: { weight: 600, reps: 1 },
+    });
+    expect(result.tier).not.toBe("Primordial");
+    expect(result.score).toBeLessThan(fixture.thresholds.back.Primordial);
+  });
+
+  it("FIXED: weight and reps are bounded", () => {
+    expect(validateLifts("chest", { bench: { weight: 99999, reps: 99 } })).toMatchObject({
+      ok: false,
+    });
+  });
+
+  it("FIXED: chest anchor scores are now strictly increasing", () => {
+    const chestScores = CHEST_TIERS_IN_ORDER.map((tier) => CHEST_TIER_SCORES[tier]);
+    expect(chestScores).toEqual([...chestScores].sort((a, b) => a - b));
+
+    // Back was already ordered correctly, which is why only chest's anchor moved.
     const backScores = BACK_TIERS_IN_ORDER.map((tier) => BACK_TIER_SCORES[tier]);
     expect(backScores).toEqual([...backScores].sort((a, b) => a - b));
+
+    expect(CHEST_TIER_SCORES.Primordial).toBe(2491.6);
+    expect(CHEST_TIER_SCORES.Primordial).toBeGreaterThan(CHEST_TIER_SCORES.Immortal);
   });
 
-  it("the inversion survives only because Primordial is outside the ladder", () => {
-    // What the engine now guarantees: the tiers it actually searches strictly
-    // increase, for both muscles. The chest inversion above is still there, but
-    // it can only hide in the override tier, which the ladder excludes.
+  it("FIXED: the ladder now contains every tier the engine can return", () => {
     for (const muscle of ["chest", "back"]) {
-      const mins = getRankingEngine(muscle).thresholds.map((threshold) => threshold.min);
-      expect(mins.length, `${muscle} ladder length`).toBe(10);
+      const thresholds = getRankingEngine(muscle).thresholds;
+      const mins = thresholds.map((threshold) => threshold.min);
+
+      // 11, not 10: Primordial joined the ladder when the override left.
+      expect(mins.length, `${muscle} ladder length`).toBe(11);
+      expect(thresholds.map((t) => t.tier).at(-1)).toBe("Primordial");
       for (let i = 1; i < mins.length; i += 1) {
         expect(mins[i], `${muscle} threshold ${i}`).toBeGreaterThan(mins[i - 1]);
       }
     }
-    const ladderTiers = getRankingEngine("chest").thresholds.map((t) => t.tier);
-    expect(ladderTiers).not.toContain("Primordial");
-    expect(ladderTiers).not.toContain("Untrained");
+    // Untrained is the one tier outside the ladder, and it has no anchor lifts.
+    expect(getRankingEngine("chest").thresholds.map((t) => t.tier)).not.toContain("Untrained");
   });
 
-  it("DEFECT: 0.02 lb of bench skips nine tiers", () => {
+  it("FIXED: 0.02 lb of bench no longer skips nine tiers", () => {
+    // Both sides of the old override boundary are now incomplete lift sets, and
+    // both are refused, so the cliff has nothing to stand on.
     const below = fixture.cases.find((c) => c.id === "chest-override-below");
     const above = fixture.cases.find((c) => c.id === "chest-override-above");
-    expect(computeChestTier(below.lifts).tier).toBe("Novice");
-    expect(computeChestTier(above.lifts).tier).toBe("Primordial");
+
     expect(above.lifts.bench.weight - below.lifts.bench.weight).toBeLessThan(0.02);
+    expect(below.rejected).toBeDefined();
+    expect(above.rejected).toBeDefined();
+    expect(below.rejected.errors).toEqual(above.rejected.errors);
+
+    // Completed with identical accessory lifts, the two now land on the same
+    // tier, which is what "no cliff" means.
+    const complete = (bench) => ({
+      bench,
+      incline_db: { weight: 45, reps: 8 },
+      cable: { weight: 20, reps: 12 },
+    });
+    const lower = computeChestTier(complete(below.lifts.bench));
+    const upper = computeChestTier(complete(above.lifts.bench));
+    expect(lower.tier).toBe(upper.tier);
+    expect(Math.abs(upper.score - lower.score)).toBeLessThanOrEqual(1);
   });
 });
 
@@ -254,9 +351,7 @@ describe("ranking module imports are order-independent", () => {
     const ranking = await import("../src/ranking/index.js");
 
     expect(ranking.computeChestTier(MID_CHEST_SET).tier).toBe("Novice");
-    expect(ranking.computeBackTier({ deadlift: { weight: 600, reps: 1 } }).tier).toBe(
-      "Primordial"
-    );
+    expect(ranking.computeBackTier(ranking.BACK_TIER_ANCHORS.Primordial).tier).toBe("Primordial");
   });
 });
 

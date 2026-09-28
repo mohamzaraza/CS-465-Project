@@ -8,7 +8,8 @@
 //
 // The numbers are the ones the engines ran on before this refactor: multipliers
 // 1.2 for both muscles, and the anchor lifts exactly as chestTierAnchors.js and
-// backTierAnchors.js stored them.
+// backTierAnchors.js stored them — with one approved exception, the chest
+// Primordial anchor, noted where it is defined.
 
 // Every muscle currently shares this ladder, but it is repeated per muscle
 // rather than shared, because a muscle is allowed to have its own tier names.
@@ -27,10 +28,19 @@ const TIERS_IN_ORDER = [
   "Primordial",
 ];
 
-// The tiers the score ladder is actually built from: everything except the
-// zero tier (no anchor lifts) and the override tier (reached by a 1RM check,
-// not by score). Slicing rather than re-listing keeps the two in step.
-const SCORED_TIERS = TIERS_IN_ORDER.slice(1, -1);
+// The tiers the score ladder is actually built from: everything except the zero
+// tier, which has no anchor lifts. Primordial used to be excluded too, because a
+// 1RM override rule owned it; that rule is gone and the tier is now earned by
+// score like every other. Slicing rather than re-listing keeps the two in step.
+const SCORED_TIERS = TIERS_IN_ORDER.slice(1);
+
+// Rep counts are bounded the same way for every lift: a whole number from 1 to
+// 30. The cap matters because `volume` is linear in reps with nothing to damp
+// it, so an unbounded rep count is an unbounded score. 30 is far above a real
+// working set, which is the point — it rejects the absurd without touching
+// anybody's real numbers. It does NOT close the volume exploit; see the
+// "Behavior changes (Prompt 3)" section of ENHANCEMENT_2_CHANGELOG.md.
+const REP_BOUNDS = { min: 1, max: 30 };
 
 export const CHEST_CONFIG = {
   muscle: "chest",
@@ -39,10 +49,31 @@ export const CHEST_CONFIG = {
   // Order matters: the engine accumulates in this order, and the original
   // computeChestScore added bench, then incline_db, then cable. Floating-point
   // addition is not associative, so reordering this would move scores.
+  //
+  // Each lift carries its own input bounds, so adding a muscle never means
+  // editing the validator. The weight maxima are deliberately generous — roughly
+  // two to three times the heaviest weight the golden-master generator produces
+  // for that lift — because their job is to refuse the physically impossible
+  // (a 99999 lb bench), not to judge anyone's training.
   lifts: [
-    { key: "bench", formula: "epley1RM", factor: 1 },
-    { key: "incline_db", formula: "volume", factor: 1.1 },
-    { key: "cable", formula: "volume", factor: 0.9 },
+    {
+      key: "bench",
+      formula: "epley1RM",
+      factor: 1,
+      bounds: { weight: { min: 1, max: 1000 }, reps: REP_BOUNDS },
+    },
+    {
+      key: "incline_db",
+      formula: "volume",
+      factor: 1.1,
+      bounds: { weight: { min: 1, max: 300 }, reps: REP_BOUNDS },
+    },
+    {
+      key: "cable",
+      formula: "volume",
+      factor: 0.9,
+      bounds: { weight: { min: 1, max: 300 }, reps: REP_BOUNDS },
+    },
   ],
 
   tierOrder: TIERS_IN_ORDER,
@@ -50,8 +81,11 @@ export const CHEST_CONFIG = {
 
   // Seeded as the answer when the score clears no threshold. This reproduces
   // the original `let bestTier = "Recruit"`, which is defect 1 in the change
-  // log: a score below the Recruit anchor is still reported as Recruit.
-  // Prompt 3 decides what to do about it.
+  // log: a score below the Recruit anchor is still reported as Recruit. Prompt 3
+  // deliberately left it alone — it was not one of the approved changes — so it
+  // is still open. Note the knock-on: now that a valid set must have every lift
+  // at 1 lb or more for 1 rep or more, no valid input can score 0, so zeroTier
+  // is only reachable through a direct engine call.
   floorTier: "Recruit",
   ladder: SCORED_TIERS,
 
@@ -118,22 +152,25 @@ export const CHEST_CONFIG = {
       cable: { weight: 50, reps: 12 },
     },
 
-    // Dead data, kept so the exported anchor table is unchanged: Primordial is
-    // the override tier, so this anchor is never scored into the ladder. It is
-    // also the reason it CAN'T be: at 1703.4 it scores below Immortal's 2253.2,
-    // which would break a strictly-increasing ladder.
+    // Changed in Prompt 3, with approval, and the only anchor that moved. It was
+    // bench 405x1 / incline_db 115x4 / cable 55x10, which scores 1703.4 — BELOW
+    // Immortal's 2253.2. That inversion was invisible only because a 1RM override
+    // rule owned this tier and the ladder skipped it; with the override deleted,
+    // Primordial has to be earned by score, so its anchor has to sit on top.
+    //
+    // These lifts were not picked to hit a number. Celestial -> Immortal steps
+    // +50 lb bench, +10 lb incline_db, +5 lb cable at reps 4/8/12, so Primordial
+    // repeats that step once more. Result: 2491.6, a gap of +238.4 over Immortal,
+    // which sits inside the range the rest of the ladder already uses (gaps
+    // 116.4 to 335.6). The 415 lb bench is the weight the deleted override asked
+    // for, now as a 4-rep set inside a complete lift set instead of a single that
+    // ignored the other two lifts.
     Primordial: {
-      bench: { weight: 405, reps: 1 },
-      incline_db: { weight: 115, reps: 4 },
-      cable: { weight: 55, reps: 10 },
+      bench: { weight: 415, reps: 4 },
+      incline_db: { weight: 115, reps: 8 },
+      cable: { weight: 55, reps: 12 },
     },
   },
-
-  // Preserved exactly as it behaves today, defect and all: the check is on one
-  // lift's unfactored 1RM and ignores the score entirely, so a bench single at
-  // 415 lb reaches the top tier on a score below the Warrior anchor. Recorded
-  // as defect 3; Prompt 3 fixes it.
-  override: { tier: "Primordial", lift: "bench", formula: "epley1RM", min: 415 },
 };
 
 export const BACK_CONFIG = {
@@ -142,11 +179,26 @@ export const BACK_CONFIG = {
 
   // Original order in computeBackScore: lat_pulldown, db_row, deadlift.
   lifts: [
-    { key: "lat_pulldown", formula: "volume", factor: 1.6 },
-    { key: "db_row", formula: "volume", factor: 1.2 },
+    {
+      key: "lat_pulldown",
+      formula: "volume",
+      factor: 1.6,
+      bounds: { weight: { min: 1, max: 600 }, reps: REP_BOUNDS },
+    },
+    {
+      key: "db_row",
+      formula: "volume",
+      factor: 1.2,
+      bounds: { weight: { min: 1, max: 300 }, reps: REP_BOUNDS },
+    },
     // Epley first, then 0.45 — deadlift is scored as a fraction of a full 1RM
     // because it is not purely a back lift.
-    { key: "deadlift", formula: "epley1RM", factor: 0.45 },
+    {
+      key: "deadlift",
+      formula: "epley1RM",
+      factor: 0.45,
+      bounds: { weight: { min: 1, max: 1500 }, reps: REP_BOUNDS },
+    },
   ],
 
   tierOrder: TIERS_IN_ORDER,
@@ -217,18 +269,15 @@ export const BACK_CONFIG = {
       deadlift: { weight: 500, reps: 1 },
     },
 
-    // Mostly ceremonial; real Primordial promotion is via the deadlift 1RM
-    // check below. Unlike chest's, this anchor does sit above Immortal's, but
-    // it is still outside the ladder because the override owns the tier.
+    // Unchanged in Prompt 3: back's Primordial anchor already scored 5826.0,
+    // above Immortal's 5501.4, so deleting the deadlift override was enough to
+    // make it a real, earnable tier. Only chest's anchor had to move.
     Primordial: {
       lat_pulldown: { weight: 260, reps: 8 },
       db_row: { weight: 130, reps: 8 },
       deadlift: { weight: 600, reps: 1 },
     },
   },
-
-  // Same shape and same defect as chest's, on the deadlift instead.
-  override: { tier: "Primordial", lift: "deadlift", formula: "epley1RM", min: 600 },
 };
 
 export const RANKING_CONFIGS = [CHEST_CONFIG, BACK_CONFIG];

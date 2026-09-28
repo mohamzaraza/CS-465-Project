@@ -162,15 +162,21 @@ describe("findTier", () => {
 // A deliberately fictional muscle. The numbers are round placeholders chosen to
 // make the thresholds easy to read (200 / 400 / 600), NOT fitness data: nothing
 // here describes a real exercise or a real strength standard.
+//
+// It carried an `override` rule until Prompt 3 deleted that feature, and a
+// fifth tier ("Over") that only the override could reach. Both are gone, and the
+// config now carries the input bounds every lift needs.
+const TEST_BOUNDS = { weight: { min: 1, max: 1000 }, reps: { min: 1, max: 30 } };
+
 function testConfig(overrides = {}) {
   return {
     muscle: "test_muscle",
     multiplier: 2,
     lifts: [
-      { key: "lift_a", formula: "volume", factor: 1 },
-      { key: "lift_b", formula: "epley1RM", factor: 0.5 },
+      { key: "lift_a", formula: "volume", factor: 1, bounds: TEST_BOUNDS },
+      { key: "lift_b", formula: "epley1RM", factor: 0.5, bounds: TEST_BOUNDS },
     ],
-    tierOrder: ["Zero", "Low", "Mid", "High", "Over"],
+    tierOrder: ["Zero", "Low", "Mid", "High"],
     zeroTier: "Zero",
     floorTier: "Low",
     ladder: ["Low", "Mid", "High"],
@@ -179,9 +185,7 @@ function testConfig(overrides = {}) {
       Low: { lift_a: { weight: 10, reps: 10 } },
       Mid: { lift_a: { weight: 20, reps: 10 } },
       High: { lift_a: { weight: 30, reps: 10 } },
-      Over: { lift_a: { weight: 40, reps: 10 } },
     },
-    override: { tier: "Over", lift: "lift_b", formula: "epley1RM", min: 500 },
     ...overrides,
   };
 }
@@ -221,30 +225,58 @@ describe("createRankingEngine builds a third muscle from data alone", () => {
     expect(engine.rank(lifts)).toEqual({ muscle: "test_muscle", tier, score });
   });
 
-  it("applies the override on the unfactored formula result", () => {
-    // lift_b's factor is 0.5, but the override reads the raw 1RM, so a 500 lb
-    // single clears a min of 500 even though it contributes only 250 to the sum.
-    const result = engine.rank({ lift_b: { weight: 500, reps: 1 } });
-    expect(result.tier).toBe("Over");
-    expect(result.score).toBe(500 * (1 + 1 / 30) * 0.5 * 2);
-  });
-
-  it("does not apply the override to a score of zero", () => {
-    // The zero-tier return comes first, exactly as in the original engines.
+  it("returns the zero tier for a non-positive or NaN score", () => {
     expect(engine.rank({ lift_b: { weight: 0, reps: 1 } }).tier).toBe("Zero");
+    expect(engine.rank({ lift_a: { weight: -10, reps: 10 } })).toEqual({
+      muscle: "test_muscle",
+      tier: "Zero",
+      score: 0,
+    });
+    // A score that rounds to zero is a zero score, not the floor tier: it is the
+    // rounded value that gets stored, and 0 has to mean one thing.
+    expect(engine.rank({ lift_a: { weight: 0.1, reps: 1 } })).toEqual({
+      muscle: "test_muscle",
+      tier: "Zero",
+      score: 0,
+    });
   });
 
-  it("is reachable through a config with no override at all", () => {
-    const noOverride = testConfig({ override: undefined, tierOrder: ["Zero", "Low", "Mid", "High"] });
-    const plain = createRankingEngine(noOverride);
-    expect(plain.rank({ lift_b: { weight: 5000, reps: 1 } }).tier).toBe("High");
+  it("scores the top tier by score alone, with no override rule to shortcut it", () => {
+    // The old config promoted a 500 lb single on lift_b straight to a tier
+    // outside the ladder. That rule is deleted: a big single is worth its score.
+    const result = engine.rank({ lift_b: { weight: 500, reps: 1 } });
+    expect(result.tier).toBe("Mid");
+    expect(result.score).toBe(Math.round(500 * (1 + 1 / 30) * 0.5 * 2));
+    expect(engine.rank({ lift_b: { weight: 5000, reps: 1 } }).tier).toBe("High");
+  });
+
+  it("validates against the bounds in its own config", () => {
+    expect(engine.validate({ lift_a: { weight: 10, reps: 10 } }).ok).toBe(false);
+    expect(
+      engine.validate({
+        lift_a: { weight: 10, reps: 10 },
+        lift_b: { weight: 100, reps: 5 },
+      })
+    ).toEqual({
+      ok: true,
+      lifts: { lift_a: { weight: 10, reps: 10 }, lift_b: { weight: 100, reps: 5 } },
+    });
+  });
+
+  it("rounds the score once and classifies the tier from the rounded value", () => {
+    // lift_a scores weight * reps * 1 * 2, so 100.3 lb x 1 rep is 200.6.
+    const result = engine.rank({ lift_a: { weight: 100.3, reps: 1 } });
+    expect(result.score).toBe(201);
+    expect(Number.isInteger(result.score)).toBe(true);
+    expect(findTier(engine.thresholds, result.score, "Low")).toBe(result.tier);
   });
 });
 
 describe("createRankingEngine validation", () => {
   it("accepts both real configs (already proven by importing index.js)", () => {
-    expect(getRankingEngine("chest").thresholds).toHaveLength(10);
-    expect(getRankingEngine("back").thresholds).toHaveLength(10);
+    // 11 since Prompt 3: Primordial is a ladder tier now, not an override tier.
+    expect(getRankingEngine("chest").thresholds).toHaveLength(11);
+    expect(getRankingEngine("back").thresholds).toHaveLength(11);
   });
 
   it("throws when ladder thresholds are not strictly increasing", () => {
@@ -281,7 +313,9 @@ describe("createRankingEngine validation", () => {
   });
 
   it("throws when a tier in the order is missing from the ladder", () => {
-    // "Mid" is still listed as a tier but nothing can ever return it.
+    // "Mid" is still listed as a tier but nothing can ever return it. Before
+    // Prompt 3 an override tier was the one legitimate exception to this; now
+    // there are only two ways out of rank(), so there are no exceptions.
     const config = testConfig({ ladder: ["Low", "High"] });
     expect(() => createRankingEngine(config)).toThrow(/test_muscle/);
     expect(() => createRankingEngine(config)).toThrow(/can never be returned/);
@@ -319,16 +353,52 @@ describe("createRankingEngine validation", () => {
     expect(() => createRankingEngine(config)).toThrow(/epley1RM/);
   });
 
-  it("throws when the override names an unknown formula or lift", () => {
-    expect(() =>
-      createRankingEngine(testConfig({ override: { tier: "Over", lift: "lift_b", formula: "nope", min: 1 } }))
-    ).toThrow(/override names unknown formula "nope"/);
+  it("throws when a config brings back the deleted override rule", () => {
+    // The rule was removed on purpose. Re-adding it as data would otherwise be
+    // silently ignored, which is the worst of both outcomes: the config would
+    // claim a promotion path that no longer exists.
+    const config = testConfig({
+      override: { tier: "High", lift: "lift_b", formula: "epley1RM", min: 500 },
+    });
+    expect(() => createRankingEngine(config)).toThrow(/unknown config key\(s\) "override"/);
+    expect(() => createRankingEngine(config)).toThrow(/test_muscle/);
+  });
 
+  it("throws for any unknown key, on the config or on a lift", () => {
+    expect(() => createRankingEngine(testConfig({ mutliplier: 3 }))).toThrow(
+      /unknown config key\(s\) "mutliplier"/
+    );
     expect(() =>
       createRankingEngine(
-        testConfig({ override: { tier: "Over", lift: "lift_z", formula: "epley1RM", min: 1 } })
+        testConfig({
+          lifts: [{ key: "lift_a", formula: "volume", factor: 1, bounds: TEST_BOUNDS, min: 5 }],
+        })
       )
-    ).toThrow(/override reads unknown lift "lift_z"/);
+    ).toThrow(/lift "lift_a" sets unknown key\(s\) "min"/);
+  });
+
+  it("throws when a lift has no usable input bounds", () => {
+    const withBounds = (bounds) =>
+      testConfig({ lifts: [{ key: "lift_a", formula: "volume", factor: 1, bounds }] });
+
+    expect(() => createRankingEngine(withBounds(undefined))).toThrow(
+      /lift "lift_a" needs input bounds for weight and reps/
+    );
+    expect(() => createRankingEngine(withBounds({ reps: { min: 1, max: 30 } }))).toThrow(
+      /lift "lift_a" needs weight bounds with a min and a max/
+    );
+    expect(() =>
+      createRankingEngine(withBounds({ weight: { min: 1, max: "lots" }, reps: { min: 1, max: 30 } }))
+    ).toThrow(/finite weight max/);
+    expect(() =>
+      createRankingEngine(withBounds({ weight: { min: 500, max: 10 }, reps: { min: 1, max: 30 } }))
+    ).toThrow(/weight min of 500 above its max of 10/);
+    expect(() =>
+      createRankingEngine(withBounds({ weight: { min: 0, max: 100 }, reps: { min: 1, max: 30 } }))
+    ).toThrow(/needs a weight min above 0, got 0/);
+    expect(() =>
+      createRankingEngine(withBounds({ weight: { min: 1, max: 100 }, reps: { min: 1, max: 30.5 } }))
+    ).toThrow(/whole-number reps max, got 30.5/);
   });
 
   it.each([0, -1, -0.5, NaN, Infinity, -Infinity, "2", null, undefined])(

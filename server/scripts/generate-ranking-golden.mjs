@@ -1,9 +1,21 @@
 // Records the ranking engines' CURRENT behavior into
-// tests/fixtures/ranking-golden.json, before Enhancement 2 changes anything.
+// tests/fixtures/ranking-golden-v2.json.
 //
-// This file makes no judgement about whether the behavior is correct. Several
-// of the recorded outputs are wrong (see knownDefects); freezing them is the
-// point, so that a refactor has to prove which outputs it changed on purpose.
+// It used to write ranking-golden.json, the v1 baseline taken before Enhancement
+// 2 touched anything. Prompt 3 changed behavior on purpose, so v1 can no longer
+// be reproduced and this script no longer writes it: v1 stays in git as history,
+// regenerable only at commit 50011da. tests/ranking.behavior-changes.test.js is
+// what holds the two files against each other and pins the exact difference.
+//
+// This file still makes no judgement about whether the behavior is correct. Some
+// recorded outputs are still wrong (see knownDefects, which now says which
+// defects Prompt 3 closed and which are still open); freezing them is the point,
+// so that a later change has to prove which outputs it moved on purpose.
+//
+// Case ids and inputs are deliberately unchanged from v1 wherever the data
+// allows, because that is what lets the two fixtures be diffed entry by entry.
+// An input that DID have to change (chest's Primordial anchor, and the probes
+// derived from it) is listed in INPUTS_CHANGED_SINCE_V1 below.
 //
 // Plain Node, no dependencies. Run: npm run ranking:golden
 
@@ -20,7 +32,23 @@ import {
   computeBackTier,
   computeChestScore,
   computeChestTier,
+  getRankingEngine,
+  validateLifts,
 } from "../src/ranking/index.js";
+// The configs themselves, for the bounds the fixture records. index.js is the
+// entry point for ranking BEHAVIOR; this is data about the configuration.
+import { RANKING_CONFIGS } from "../src/ranking/rankingConfig.js";
+
+// The four entries whose LIFTS differ from v1, all for the same approved reason:
+// chest's Primordial anchor moved, and two threshold probes are derived from it.
+// Named here so the behavior-changes test can assert this list is exhaustive
+// rather than trusting a diff to be all output.
+const INPUTS_CHANGED_SINCE_V1 = [
+  "chest-anchor-Primordial",
+  "chest-threshold-Primordial-below",
+  "chest-threshold-Primordial-above",
+  "chest-defect-anchors-not-monotonic",
+];
 
 const SEED = 20250928;
 const RANDOM_CASES_PER_MUSCLE = 300;
@@ -57,7 +85,9 @@ const MUSCLES = {
     // Lift used to place an input on an exact score threshold. Its score is
     // linear in weight, so one probe call gives the slope.
     probeLift: "incline_db",
-    // Lift the Primordial override inspects, and the 1RM it demands.
+    // The lift and 1RM the DELETED Primordial override used to inspect. Kept so
+    // the two inputs that straddled it are still recorded under their v1 ids;
+    // both are now rejected as incomplete, which is the whole point.
     overrideLift: "bench",
     overrideMin1RM: 415,
     // Ranges for the seeded random cases (weights in lb).
@@ -106,8 +136,17 @@ function anchorScore(muscle, tier) {
   return MUSCLES[muscle].computeScore(anchor);
 }
 
+// An entry records one of two outcomes, never both: `expected` for input the
+// server accepts, `rejected` for input it refuses. Recording the refusal rather
+// than dropping the case is what keeps v1's case list diffable against v2 and
+// what stops a future change from quietly accepting something again.
 function makeCase(id, muscle, group, label, lifts) {
-  const result = MUSCLES[muscle].computeTier(lifts);
+  const checked = validateLifts(muscle, lifts);
+  if (!checked.ok) {
+    return { id, muscle, group, label, lifts, rejected: { errors: checked.errors } };
+  }
+
+  const result = MUSCLES[muscle].computeTier(checked.lifts);
   return {
     id,
     muscle,
@@ -176,8 +215,9 @@ function thresholdCases(muscle) {
     }
   }
 
-  // The Primordial promotion is a 1RM check on one lift, not a score check, so
-  // it needs its own boundary pair.
+  // The two inputs that straddled the DELETED Primordial 1RM override, kept
+  // under their v1 ids. In v1 these differed by 0.0194 lb and by nine tiers;
+  // now they are both simply incomplete lift sets, and both are rejected.
   const { overrideLift, overrideMin1RM } = MUSCLES[muscle];
   for (const side of ["below", "above"]) {
     const delta = side === "below" ? -THRESHOLD_DELTA : THRESHOLD_DELTA;
@@ -187,10 +227,53 @@ function thresholdCases(muscle) {
         `${muscle}-override-${side}`,
         muscle,
         `threshold-${side}`,
-        `${overrideLift} 1RM ${THRESHOLD_DELTA} ${side} the Primordial override cutoff (${overrideMin1RM})`,
+        `${overrideLift} 1RM ${THRESHOLD_DELTA} ${side} the removed Primordial override cutoff (${overrideMin1RM})`,
         { [overrideLift]: { weight, reps: 1 } }
       )
     );
+  }
+
+  return cases;
+}
+
+// (b2) New in v2. The (b) probes above are all single-lift, so every one of them
+// is now rejected as incomplete input — which records the rejection but pins
+// nothing about where a tier actually starts. These probes are complete lift
+// sets: the tier's own anchor with the probe lift's weight solved so the total
+// lands exactly ON the tier's threshold, and 0.51 below it.
+//
+// 0.51, not 0.01, because the boundary moved: rank() classifies a ROUNDED score
+// against rounded thresholds, so the first score that misses tier N is N - 0.51
+// (which rounds to N - 1), not N - 0.01 (which rounds back up to N).
+function roundedThresholdCases(muscle) {
+  const cases = [];
+  const { probeLift, computeScore, anchors } = MUSCLES[muscle];
+
+  for (const { tier, min } of getRankingEngine(muscle).thresholds) {
+    const anchor = structuredClone(anchors[tier]);
+    const { reps } = anchor[probeLift];
+
+    // The scorer is linear in the probe lift's weight, so one call at 1 lb gives
+    // the slope and one at 0 lb gives everything the other lifts contribute.
+    const perLb = computeScore({ [probeLift]: { weight: 1, reps } });
+    const base = computeScore({ ...anchor, [probeLift]: { weight: 0, reps } });
+
+    for (const [side, target] of [
+      ["at", min],
+      ["below", min - 0.51],
+    ]) {
+      const weight = (target - base) / perLb;
+      cases.push(
+        makeCase(
+          `${muscle}-rounded-${tier}-${side}`,
+          muscle,
+          `rounded-${side}`,
+          `${tier} anchor with ${probeLift} solved so the score rounds to ${Math.round(target)}` +
+            `, against a ${tier} threshold of ${min}`,
+          { ...anchor, [probeLift]: { weight, reps } }
+        )
+      );
+    }
   }
 
   return cases;
@@ -272,78 +355,163 @@ function edgeCases(muscle) {
   );
 }
 
-// (e) The defects measured before Enhancement 2 began. Each entry says what is
-// wrong; the expected values are still whatever the code does today.
+// (e) The defects measured before Enhancement 2 began, each carrying what Prompt
+// 3 did about it. `status` is the honest part: "fixed" means the defect is gone,
+// "reduced" means the worst inputs are refused but the underlying flaw is still
+// there, and "open" means nothing was done. The recorded outcome is still
+// whatever the code does today, not what it ought to do.
 function knownDefectCases() {
   const entries = [
     {
       id: "chest-defect-sub-recruit-floors-at-recruit",
       muscle: "chest",
+      status: "open",
       defect: "A score far below the Recruit anchor still returns Recruit",
       why:
-        "computeChestTier seeds bestTier = 'Recruit' and never reconsiders it, so " +
-        `anything scoring under the Recruit anchor (${anchorScore("chest", "Recruit")}) ` +
+        "rank() seeds the answer with floorTier = 'Recruit' and only ever raises " +
+        `it, so anything scoring under the Recruit anchor (${anchorScore("chest", "Recruit")}) ` +
         "is reported as Recruit instead of Untrained.",
+      resolution:
+        "Not fixed: it was not one of the approved Prompt 3 changes. This input no " +
+        "longer reaches the engine at all (one lift out of three), so the defect " +
+        "is now demonstrated by chest-open-floor-tier-below-recruit instead.",
       lifts: { incline_db: { weight: 15, reps: 8 } },
     },
     {
       id: "chest-defect-unbounded-volume",
       muscle: "chest",
+      status: "reduced",
       defect: "Unbounded reps let a trivial weight outrank a heavy bench",
       why:
         "incline_db scores weight * reps * 1.1 with no rep cap, so 100 reps of a " +
         "15 lb dumbbell outscores the Celestial anchor, whose bench is 315 lb.",
+      resolution:
+        "Reduced, not closed. Reps are now capped at 30, so this input is refused, " +
+        "but volume is still linear in reps up to the cap: see " +
+        "chest-open-rep-cap-does-not-close-volume. Closing it means changing the " +
+        "formulas, which would move every tier and was out of scope.",
       lifts: { incline_db: { weight: 15, reps: 100 } },
     },
     {
       id: "chest-defect-override-ignores-score",
       muscle: "chest",
+      status: "fixed",
       defect: "The Primordial override ignores the score entirely",
       why:
-        "A single bench triple-check at 415 lb promotes to Primordial even though " +
+        "A single bench rep at 415 lb promotes to Primordial even though " +
         `the resulting score sits below the Warrior anchor (${anchorScore("chest", "Warrior")}).`,
+      resolution:
+        "Fixed: the override rule is deleted, so Primordial is earned by score " +
+        `(${anchorScore("chest", "Primordial")}) like every other tier. This input ` +
+        "is also refused now, because a bench alone is not a chest lift set.",
       lifts: { bench: { weight: 415, reps: 1 } },
     },
     {
       id: "chest-defect-no-input-bounds",
       muscle: "chest",
+      status: "fixed",
       defect: "No upper bound on weight or reps",
       why:
         "Nothing rejects physically impossible input, so a 99999 lb bench for 99 " +
         "reps is scored and stored rather than refused.",
+      resolution: "Fixed: every lift carries weight and rep bounds, and this input breaks both.",
       lifts: { bench: { weight: 99999, reps: 99 } },
     },
     {
       id: "chest-defect-anchors-not-monotonic",
       muscle: "chest",
+      status: "fixed",
       defect: "Chest anchor scores are not strictly increasing",
       why:
-        `The Primordial anchor scores ${anchorScore("chest", "Primordial")}, below ` +
-        `Immortal's ${anchorScore("chest", "Immortal")}. The loop's ` +
-        "'anchorScore >= bestAnchor' guard hides the inversion instead of failing, " +
-        "and the Primordial anchor is dead data because the loop skips that tier.",
+        "The v1 Primordial anchor (bench 405x1, incline_db 115x4, cable 55x10) " +
+        `scored 1703.4, below Immortal's ${anchorScore("chest", "Immortal")}, and the ` +
+        "ladder hid it by excluding the tier the override owned.",
+      resolution:
+        "Fixed: the anchor is now bench 415x4, incline_db 115x8, cable 55x12, scoring " +
+        `${anchorScore("chest", "Primordial")}. Startup validation would now refuse ` +
+        "the old value. NOTE: this entry's lifts are the anchor itself, so its input " +
+        "differs from v1.",
       lifts: structuredClone(CHEST_TIER_ANCHORS.Primordial),
     },
     {
       id: "back-defect-override-ignores-score",
       muscle: "back",
+      status: "fixed",
       defect: "Back repeats the chest override defect",
       why:
         "A 600 lb deadlift single promotes to Primordial at a score below back's " +
         `own Recruit anchor (${anchorScore("back", "Recruit")}).`,
+      resolution:
+        "Fixed: the override is deleted. Back's Primordial anchor already scored " +
+        `${anchorScore("back", "Primordial")}, above Immortal's ` +
+        `${anchorScore("back", "Immortal")}, so no anchor had to move.`,
       lifts: { deadlift: { weight: 600, reps: 1 } },
+    },
+
+    // Added in v2: what is still wrong, with input the server actually accepts.
+    {
+      id: "chest-open-floor-tier-below-recruit",
+      muscle: "chest",
+      status: "open",
+      defect: "A complete but very light set is still reported as Recruit",
+      why:
+        "The same floorTier defect as above, now shown with valid input: a set this " +
+        `light scores far under the Recruit anchor (${anchorScore("chest", "Recruit")}) ` +
+        "and is still called Recruit rather than Untrained.",
+      resolution: "Open. Not an approved Prompt 3 change.",
+      lifts: {
+        bench: { weight: 45, reps: 1 },
+        incline_db: { weight: 15, reps: 1 },
+        cable: { weight: 5, reps: 1 },
+      },
+    },
+    {
+      id: "chest-open-rep-cap-does-not-close-volume",
+      muscle: "chest",
+      status: "open",
+      defect: "The rep cap reduces the volume exploit but does not close it",
+      why:
+        "Every weight here is the Heroic anchor's, but claimed for 30 reps instead " +
+        `of 8 or 12. Heroic scores ${anchorScore("chest", "Heroic")}; this reaches ` +
+        "Primordial, because volume is linear in reps all the way to the cap.",
+      resolution:
+        "Open by decision: closing it means changing the formulas, which would move " +
+        "every tier. The cap only removes the absurd inputs above 30 reps.",
+      lifts: {
+        bench: { weight: 135, reps: 30 },
+        incline_db: { weight: 45, reps: 30 },
+        cable: { weight: 20, reps: 30 },
+      },
+    },
+    {
+      id: "back-open-rep-cap-does-not-close-volume",
+      muscle: "back",
+      status: "open",
+      defect: "Back has the same residual volume exploit",
+      why:
+        `Heroic-anchor weights (Heroic scores ${anchorScore("back", "Heroic")}) claimed ` +
+        "for 30 reps each reach Primordial, and back leans on volume harder than " +
+        "chest does: its lat_pulldown factor is 1.6.",
+      resolution: "Open by decision, for the same reason as chest's.",
+      lifts: {
+        lat_pulldown: { weight: 130, reps: 30 },
+        db_row: { weight: 65, reps: 30 },
+        deadlift: { weight: 225, reps: 30 },
+      },
     },
   ];
 
   return entries.map((entry) => {
-    const result = MUSCLES[entry.muscle].computeTier(entry.lifts);
+    const outcome = makeCase(entry.id, entry.muscle, "knownDefect", entry.defect, entry.lifts);
     return {
       id: entry.id,
       muscle: entry.muscle,
+      status: entry.status,
       defect: entry.defect,
       why: entry.why,
+      resolution: entry.resolution,
       lifts: entry.lifts,
-      expected: { tier: result.tier, score: result.score },
+      ...(outcome.rejected ? { rejected: outcome.rejected } : { expected: outcome.expected }),
     };
   });
 }
@@ -360,16 +528,32 @@ function build() {
     cases.push(
       ...anchorCases(muscle),
       ...thresholdCases(muscle),
+      ...roundedThresholdCases(muscle),
       ...randomCases(muscle, rng),
       ...singleLiftCases(muscle),
       ...edgeCases(muscle)
     );
   }
 
+  // Both values, because they are two different things now: the score the anchor
+  // lifts actually produce, and the integer threshold rank() compares against.
   const anchorScores = {};
+  const thresholds = {};
   for (const muscle of Object.keys(MUSCLES)) {
     anchorScores[muscle] = Object.fromEntries(
       MUSCLES[muscle].tiersInOrder.map((tier) => [tier, anchorScore(muscle, tier)])
+    );
+    thresholds[muscle] = Object.fromEntries(
+      getRankingEngine(muscle).thresholds.map(({ tier, min }) => [tier, min])
+    );
+  }
+
+  // The limits every entry marked `rejected` was rejected against, recorded so
+  // the fixture explains itself without the reader opening rankingConfig.js.
+  const bounds = {};
+  for (const config of RANKING_CONFIGS) {
+    bounds[config.muscle] = Object.fromEntries(
+      config.lifts.map((lift) => [lift.key, lift.bounds])
     );
   }
 
@@ -377,13 +561,18 @@ function build() {
     // Deliberately no timestamp: the file has to be byte-identical between runs
     // so that regenerating it produces an empty diff when nothing changed.
     generator: "server/scripts/generate-ranking-golden.mjs",
+    version: 2,
     purpose:
-      "Golden master of the chest and back ranking engines as they behaved " +
-      "before Enhancement 2. Expected values are recorded output, not desired " +
-      "output; see knownDefects.",
+      "Golden master of the chest and back ranking engines after the Prompt 3 " +
+      "behavior fixes: input validation, the Primordial ladder, one rounding. " +
+      "Expected values are recorded output, not desired output; see knownDefects, " +
+      "and see ranking-golden.json for the v1 baseline this replaced.",
     seed: SEED,
     multipliers: { chest: CHEST_MULTIPLIER, back: BACK_MULTIPLIER },
     anchorScores,
+    thresholds,
+    bounds,
+    inputsChangedSinceV1: INPUTS_CHANGED_SINCE_V1,
     caseCount: cases.length,
     cases,
     knownDefects: knownDefectCases(),
@@ -391,13 +580,15 @@ function build() {
 }
 
 const fixture = build();
-const outUrl = new URL("../tests/fixtures/ranking-golden.json", import.meta.url);
+const outUrl = new URL("../tests/fixtures/ranking-golden-v2.json", import.meta.url);
 mkdirSync(new URL("../tests/fixtures/", import.meta.url), { recursive: true });
 // "\n" explicitly: the file must not pick up CRLF from the platform, or two
 // runs on different machines would not be byte-identical.
 writeFileSync(outUrl, `${JSON.stringify(fixture, null, 2)}\n`, "utf8");
 
+const rejected = [...fixture.cases, ...fixture.knownDefects].filter((c) => c.rejected).length;
 console.log(
-  `Wrote tests/fixtures/ranking-golden.json - ` +
-    `${fixture.caseCount} cases, ${fixture.knownDefects.length} known defects.`
+  `Wrote tests/fixtures/ranking-golden-v2.json - ` +
+    `${fixture.caseCount} cases (${rejected} of them now rejected as invalid input), ` +
+    `${fixture.knownDefects.length} known defects.`
 );
