@@ -1,5 +1,109 @@
 # Enhancement 2 Change Log: Algorithms and Data Structures
 
+## Summary
+
+The detailed sections below were written as each prompt landed. This section
+is the final picture, measured at the end of the branch against the tag
+`baseline-before-enhancement-2`.
+
+### Problems from the code review (algorithms category)
+
+| Problem | What changed | Files | How it was verified |
+|---|---|---|---|
+| Constant work in a loop | Anchor scores are computed once at startup into a sorted, frozen threshold array; a request scores only the user's lifts and finds the tier by binary search. | `src/ranking/rankingEngine.js`, `rankingConfig.js`, `index.js` | v1 golden master reproduced unchanged by the refactor (Prompt 2); `ranking.engine.test.js` checks `findTier` against a linear scan and caps comparisons at `ceil(log2(n + 1))`; instrumented count below. |
+| Conflicting top-tier rules | The 1RM override is deleted; Primordial is earned by score like every tier. Chest's inverted Primordial anchor (1703.4 < Immortal's 2253.2) was replaced, with approval, by one that continues the ladder's own step (2491.6). A strictly-increasing check on the rounded ladder refuses an inversion at startup. | `rankingConfig.js`, `rankingEngine.js` | `ranking.behavior-changes.test.js` pins every entry that moved from v1 to v2; `ranking.rounding.test.js` asserts the old anchor would now be refused. |
+| Unbounded reps | Reps must be a whole number from 1 to 30 for every lift. This **reduces** the volume exploit and does not close it (see "What the rep cap does and does not fix"). | `rankingConfig.js`, `validateLifts.js` | `validateLifts.test.js` checks both edges of every bound; two `status: "open"` entries in v2 pin the remaining exploit. |
+| No validation | New pure `validateLifts`, driven by per-lift bounds in the config, reports every problem at once; the controller answers 400 with `{ error, errors }` before touching the cooldown or the database. | `validateLifts.js`, `controllers/rankingController.js` | `validateLifts.test.js`, `rankingController.test.js`, and the property test in `ranking.property.test.js`. |
+| Duplicated engines and dead config | Four hand-copied files (two engines, two anchor tables) became one engine plus one data file; the unused and wrong `src/config/muscleMultipliers.js` is deleted; the import cycle and the import-time `console.log` calls are gone. | `src/ranking/*` | `ranking.imports.test.js` proves the import graph acyclic (and tests its own detector); a third, fictional muscle is built from data alone in `ranking.engine.test.js`. |
+| Broken back route | `POST /api/rank/back` returned 500 for every request (`computeBackTier` was never imported). One handler factory now serves both muscles; back computes and returns a rank **without saving** it, because a per-muscle cooldown needs schema work. | `controllers/rankingController.js` | `rankingController.test.js` (supertest, Prisma mocked). The new server lint also reports the original bug as `no-undef` when run on the baseline. |
+| Rounding | The score is rounded once, inside `rank()`, and the tier is chosen from that integer against thresholds rounded the same way, so a stored score always re-derives its stored tier. | `rankingEngine.js`, `rankingController.js` | `ranking.rounding.test.js` and `ranking.property.test.js` (6,000 seeded valid sets each). |
+| Ties | Competition ranking (1, 2, 2, 4) on both leaderboards, a deterministic `userId` tie-break, and a new total leaderboard that picks its top 20 with an array-backed min-heap. The client's React key was changed so tied rows stay unique. | `src/ranking/leaderboard.js`, `controllers/leaderboardController.js`, `routes/leaderboardRoutes.js`, `client/.../TotalLeaderboard.jsx` | `leaderboard.test.js` (heap against `Array.sort`, `topK` against stable sort-then-slice, comparator-count bound), `leaderboardController.test.js`, `TotalLeaderboard.test.jsx`. |
+
+The final review (Prompt 5) added three small fixes, each committed with a test
+that failed first: config validation now refuses a zero or negative lift
+`factor` (it only required a finite one, so a bad factor on a lift with no
+anchor could make a heavier lift score lower); the unreachable-tier startup
+error no longer mentions the deleted override rule; and two exports nothing
+imported (`RANKABLE_MUSCLES`, the `toLeaderboardRow` export) were removed.
+
+### Before and after, measured
+
+Node v22.19.0, win32 x64, same machine, same session. "Before" is the tag
+`baseline-before-enhancement-2`; the benchmark "before" is `701860f`, the
+baseline code plus the benchmark script, because the tag has no script.
+
+| Measure | Before | After | Command |
+|---|---|---|---|
+| `computeChestTier`, median of 3 alternating runs | 687.8 ns/call | 192.0 ns/call | `npm run bench:ranking` |
+| `computeBackTier`, median of 3 alternating runs | 685.6 ns/call | 150.9 ns/call | `npm run bench:ranking` |
+| Anchor lift terms re-scored per request, per muscle | 30 | 0 | instrumented count: a getter on every anchor lift's `weight`, over the 171 chest and 179 back complete sets in v1 |
+| Anchor lift terms scored at startup, both muscles | 66 (for an unused table and a `console.log`) | 66 (the threshold ladder, now 11 tiers each) | same instrumented count |
+| Tier comparisons per lookup | 10 (plus a re-scored anchor each) | at most 4, mean 3.76 chest / 3.71 back | same inputs, a getter on each threshold's `min` |
+| Top 20 of n = 100,000, heap vs sort + slice | - | 1,165.3 us vs 53,749.9 us | `node scripts/benchmark-topk.mjs` |
+| Server tests | 63 in 5 files | 353 in 16 files | `npm test` |
+| Client tests | 95 in 14 files | 96 in 15 files | `npm test` |
+| Server lint problems (same flat config on both trees) | 4, one of them the broken back route | 3, none in files this enhancement touched | `npm run lint` |
+| Client lint problems | 0 | 0 | `npm run lint` |
+| `npm audit`, server / client | 0 / 0 | 0 / 0 | `npm audit` |
+
+Absolute nanoseconds vary between sessions (Prompt 2 measured 359 ns before on
+a quieter run); only same-session columns compare. The three lint problems
+left are outside this enhancement's scope and were not touched:
+`controllers/authController.js:93` (unused `err`),
+`services/openaiService.js:35` (rethrown error without `cause`) and
+`utils/errorHandler.js:26` (`next` unused, but Express needs the four-argument
+signature to recognise an error handler).
+
+A manual mutation check was run and reverted: `<=` to `<` in `findTier`, the
+binary search's upper bound moved by one in each direction, and one chest
+anchor weight changed. The suite failed every time (9 to 44 failing tests
+each); no mutation survived.
+
+### Trade-offs, stated honestly
+
+- **The binary search is not why it got faster.** With 11 tiers, a linear scan
+  over the precomputed thresholds would be just as quick. The speed-up comes
+  from not re-scoring constant anchors on every request; the binary search is
+  the right structure for a sorted ladder and is bounded and tested, but at
+  this size its asymptotic advantage is not observable, and no user would feel
+  a difference measured in nanoseconds next to a database round-trip.
+- **Startup validation can take the server down.** That is deliberate: a bad
+  ladder is a crash at boot, naming the muscle and the tiers, instead of a
+  wrong rank later.
+- **The heap only helps where the app aggregates.** The chest leaderboard lets
+  the database sort and limit, so it uses no heap. The total leaderboard still
+  reads every rank row on every request (O(n) time, one entry per user in
+  memory) with no pagination or caching; the heap saves the sort, not the read.
+- **Validation is stricter than before.** Every configured lift is required,
+  and the client's own form limits do not yet match the server's bounds, so an
+  out-of-range entry now gets a 400 message instead of a rank.
+- **Rounding moves boundaries by under half a point.** Thresholds and scores
+  both use `Math.round`, so they agree; the first score that misses a tier is
+  now N - 0.51 rather than just under N.
+- **Two ranking defects remain open by decision**, both pinned in v2: the
+  volume exploit within the rep cap, and a score below the Recruit anchor still
+  reporting Recruit.
+
+### Left for Enhancement 3
+
+- **Email exposure.** Both leaderboards return the user's email as `user`;
+  `toLeaderboardRow` in `leaderboardController.js` is the single place to
+  remove it.
+- **Schema.** A muscle enum covering back, and saving back ranks at all.
+- **Cooldown column.** The cooldown reads `User.lastChestRankAt`, which is
+  chest-only; back has no cooldown until a per-muscle column exists.
+- Found in the final review and not in this enhancement's scope, so not fixed:
+  the cooldown check and the write that sets it are not atomic, so two
+  simultaneous chest requests can both pass it; a token for a user whose row no
+  longer exists makes the chest handler answer a generic 500 rather than 401;
+  and outside production the global error handler returns a 500's `message` to
+  the client (the ranking handlers are not affected: they send fixed messages).
+
+### How this was made
+
+The changes on this branch were implemented by Claude Code (Anthropic) from
+prompts I wrote, and I reviewed each commit.
+
 Branch: `enhancement-2`. Scope: the chest and back ranking engines under
 `server/src/ranking/`, `server/controllers/rankingController.js`, and the
 ranking route wiring.
