@@ -2,21 +2,15 @@
 // and exits non-zero on any mismatch.
 //
 // This duplicates what tests/ranking.characterization.test.js asserts, on
-// purpose. The Vitest run only survives the chestRanking <-> chestTierAnchors
-// import cycle because the test file imports the anchors module first; this
-// script proves the same fixture holds under plain Node module semantics,
-// where the cycle resolves differently. Once the cycle is gone, the two runs
-// are equivalent and this script is just a cheap CI hook.
+// purpose: it replays the fixture under plain Node's module and number
+// semantics rather than Vite's, so it is a cheap CI hook that does not depend
+// on the test runner agreeing.
 //
 // Plain Node, no dependencies. Run: npm run ranking:check
 
 import { readFileSync } from "node:fs";
 
-// Anchors before engines; see the comment in generate-ranking-golden.mjs.
-import "../src/ranking/chestTierAnchors.js";
-import "../src/ranking/backTierAnchors.js";
-import { computeChestTier } from "../src/ranking/chestRanking.js";
-import { computeBackTier } from "../src/ranking/backRanking.js";
+import { computeBackTier, computeChestTier } from "../src/ranking/index.js";
 
 // The fixture stores full double precision, so the only slack needed is for
 // a future Node version rounding a transcendental differently. Scores here are

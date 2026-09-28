@@ -9,31 +9,18 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 
-// The anchors modules are imported BEFORE the ranking modules on purpose.
-// chestRanking.js and chestTierAnchors.js import each other (same for back).
-// Entering the cycle through the ranking module leaves CHEST_MULTIPLIER
-// unassigned while the anchors module's top-level CHEST_TIER_SCORES is being
-// computed. Plain Node tolerates either entry order because the exported
-// functions are hoisted declarations; Vite/Vitest does not. Keep this order
-// everywhere until the cycle is removed.
-import {
-  CHEST_MULTIPLIER,
-  CHEST_TIERS_IN_ORDER,
-  CHEST_TIER_ANCHORS,
-} from "../src/ranking/chestTierAnchors.js";
 import {
   BACK_MULTIPLIER,
   BACK_TIERS_IN_ORDER,
   BACK_TIER_ANCHORS,
-} from "../src/ranking/backTierAnchors.js";
-import {
-  computeChestScore,
-  computeChestTier,
-} from "../src/ranking/chestRanking.js";
-import {
+  CHEST_MULTIPLIER,
+  CHEST_TIERS_IN_ORDER,
+  CHEST_TIER_ANCHORS,
   computeBackScore,
   computeBackTier,
-} from "../src/ranking/backRanking.js";
+  computeChestScore,
+  computeChestTier,
+} from "../src/ranking/index.js";
 
 const SEED = 20250928;
 const RANDOM_CASES_PER_MUSCLE = 300;

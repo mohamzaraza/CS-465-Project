@@ -18,13 +18,11 @@ vi.mock("../services/openaiService.js", () => ({
   askKevAi: vi.fn(),
 }));
 
-// chestRanking.js and chestTierAnchors.js import each other. Native Node
-// resolves that cycle, but Vite's module transform turns it into a
-// temporal-dead-zone error. The ranking engine is not under test here
-// (and is out of scope for this enhancement), so it is replaced.
-vi.mock("../src/ranking/chestRanking.js", () => ({
-  computeChestTier: vi.fn(),
-}));
+// The ranking engine used to be mocked here, because the chestRanking <->
+// chestTierAnchors cycle made importing the real one a temporal-dead-zone error
+// under Vite. The cycle is gone, the mock asserted nothing, and the real engine
+// now imports cleanly, so it is loaded for real. Ranking behavior itself is
+// covered by tests/ranking.*.test.js.
 
 const ALLOWED_ORIGIN = "http://localhost:5173";
 

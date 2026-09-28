@@ -1,27 +1,19 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-// IMPORT ORDER MATTERS AND IS NOT COSMETIC.
-// chestRanking.js and chestTierAnchors.js import each other, and so do the two
-// back files. Entering the cycle through a *Ranking.js module makes Vitest fail
-// the whole suite with "Cannot access '__vite_ssr_import_0__' before
-// initialization", because Vite's SSR transform has not yet assigned
-// CHEST_MULTIPLIER when the anchors module computes CHEST_TIER_SCORES at the
-// top level. Entering through the anchors module works. Plain Node tolerates
-// either order, which is why the bug only shows up under test.
-// Enhancement 2 removes the cycle; until then, do not reorder these.
-import {
-  CHEST_TIERS_IN_ORDER,
-  CHEST_TIER_SCORES,
-} from "../src/ranking/chestTierAnchors.js";
 import {
   BACK_TIERS_IN_ORDER,
-  BACK_TIER_SCORES,
-} from "../src/ranking/backTierAnchors.js";
-import { computeChestTier } from "../src/ranking/chestRanking.js";
-import { computeBackTier } from "../src/ranking/backRanking.js";
+  BACK_TIER_ANCHORS,
+  CHEST_TIERS_IN_ORDER,
+  CHEST_TIER_ANCHORS,
+  computeBackScore,
+  computeBackTier,
+  computeChestScore,
+  computeChestTier,
+  getRankingEngine,
+} from "../src/ranking/index.js";
 
 // These tests characterize the engines as they behave TODAY. Several recorded
 // outputs are wrong; the "known defects" block names them. Nothing here should
@@ -37,6 +29,35 @@ const fixture = JSON.parse(
 const SCORE_PRECISION = 6;
 
 const computeTier = { chest: computeChestTier, back: computeBackTier };
+
+// The engines used to export precomputed CHEST_TIER_SCORES / BACK_TIER_SCORES
+// tables, which existed only to feed an import-time console.log. Enhancement 2
+// deleted them. Rebuilding the same table here from the anchor data keeps the
+// assertions below on exactly the values they were written against.
+function anchorScoreTable(tiers, anchors, computeScore) {
+  return Object.fromEntries(
+    tiers.map((tier) => [tier, anchors[tier] ? computeScore(anchors[tier]) : 0])
+  );
+}
+
+const CHEST_TIER_SCORES = anchorScoreTable(
+  CHEST_TIERS_IN_ORDER,
+  CHEST_TIER_ANCHORS,
+  computeChestScore
+);
+const BACK_TIER_SCORES = anchorScoreTable(
+  BACK_TIERS_IN_ORDER,
+  BACK_TIER_ANCHORS,
+  computeBackScore
+);
+
+// A set whose recorded tier and score are asserted below; reused by the
+// import-order tests, which need a call whose answer is already pinned.
+const MID_CHEST_SET = {
+  bench: { weight: 95, reps: 8 },
+  incline_db: { weight: 25, reps: 8 },
+  cable: { weight: 10, reps: 12 },
+};
 
 function expectMatchesFixture(entry) {
   const result = computeTier[entry.muscle](entry.lifts);
@@ -96,11 +117,7 @@ describe("ranking golden master", () => {
 
 describe("ranking known values (measured before Enhancement 2)", () => {
   it("scores a mid-level chest set as Novice", () => {
-    const result = computeChestTier({
-      bench: { weight: 95, reps: 8 },
-      incline_db: { weight: 25, reps: 8 },
-      cable: { weight: 10, reps: 12 },
-    });
+    const result = computeChestTier(MID_CHEST_SET);
     expect(result.tier).toBe("Novice");
     expect(result.score).toBeCloseTo(538, SCORE_PRECISION);
   });
@@ -169,6 +186,22 @@ describe("ranking known defects (recorded, not endorsed)", () => {
     expect(backScores).toEqual([...backScores].sort((a, b) => a - b));
   });
 
+  it("the inversion survives only because Primordial is outside the ladder", () => {
+    // What the engine now guarantees: the tiers it actually searches strictly
+    // increase, for both muscles. The chest inversion above is still there, but
+    // it can only hide in the override tier, which the ladder excludes.
+    for (const muscle of ["chest", "back"]) {
+      const mins = getRankingEngine(muscle).thresholds.map((threshold) => threshold.min);
+      expect(mins.length, `${muscle} ladder length`).toBe(10);
+      for (let i = 1; i < mins.length; i += 1) {
+        expect(mins[i], `${muscle} threshold ${i}`).toBeGreaterThan(mins[i - 1]);
+      }
+    }
+    const ladderTiers = getRankingEngine("chest").thresholds.map((t) => t.tier);
+    expect(ladderTiers).not.toContain("Primordial");
+    expect(ladderTiers).not.toContain("Untrained");
+  });
+
   it("DEFECT: 0.02 lb of bench skips nine tiers", () => {
     const below = fixture.cases.find((c) => c.id === "chest-override-below");
     const above = fixture.cases.find((c) => c.id === "chest-override-above");
@@ -178,11 +211,59 @@ describe("ranking known defects (recorded, not endorsed)", () => {
   });
 });
 
+describe("ranking module imports are order-independent", () => {
+  // Before Enhancement 2 this file could only be written one way round: the
+  // anchors modules had to be imported before the *Ranking.js modules, or Vite's
+  // SSR transform failed the whole suite with "Cannot access
+  // '__vite_ssr_import_0__' before initialization". The cycle is gone, so the
+  // order cannot matter any more. These tests are what proves it, and they fail
+  // if a cycle is ever reintroduced.
+  //
+  // vi.resetModules() gives each case a fresh registry, so the engines really
+  // are rebuilt in the order under test rather than served from cache.
+
+  it("works when rankingEngine.js is imported before rankingConfig.js", async () => {
+    vi.resetModules();
+    const { createRankingEngine } = await import("../src/ranking/rankingEngine.js");
+    const { CHEST_CONFIG } = await import("../src/ranking/rankingConfig.js");
+
+    expect(createRankingEngine(CHEST_CONFIG).rank(MID_CHEST_SET).tier).toBe("Novice");
+  });
+
+  it("works when rankingConfig.js is imported before rankingEngine.js", async () => {
+    vi.resetModules();
+    const { CHEST_CONFIG } = await import("../src/ranking/rankingConfig.js");
+    const { createRankingEngine } = await import("../src/ranking/rankingEngine.js");
+
+    expect(createRankingEngine(CHEST_CONFIG).rank(MID_CHEST_SET).tier).toBe("Novice");
+  });
+
+  it("works when index.js is imported first, before anything it depends on", async () => {
+    vi.resetModules();
+    const ranking = await import("../src/ranking/index.js");
+
+    expect(ranking.computeChestTier(MID_CHEST_SET).tier).toBe("Novice");
+    expect(ranking.computeChestTier(MID_CHEST_SET).score).toBeCloseTo(538, SCORE_PRECISION);
+  });
+
+  it("works when index.js is imported last, after everything it depends on", async () => {
+    vi.resetModules();
+    await import("../src/ranking/formulas.js");
+    await import("../src/ranking/rankingConfig.js");
+    await import("../src/ranking/rankingEngine.js");
+    const ranking = await import("../src/ranking/index.js");
+
+    expect(ranking.computeChestTier(MID_CHEST_SET).tier).toBe("Novice");
+    expect(ranking.computeBackTier({ deadlift: { weight: 600, reps: 1 } }).tier).toBe(
+      "Primordial"
+    );
+  });
+});
+
 describe("ranking golden master under plain Node", () => {
-  // Vitest only survives the import cycle because this file imports the anchors
-  // modules first. Running the checker as a child process proves the fixture
-  // also holds under Node's own module semantics, where the cycle resolves
-  // differently — a guard this suite cannot provide from the inside.
+  // Running the checker as a child process proves the fixture holds under
+  // Node's own module and number semantics, not just under Vite's transform —
+  // a guard this suite cannot provide from the inside.
   it("passes check-ranking-golden.mjs with exit code 0", () => {
     const script = fileURLToPath(
       new URL("../scripts/check-ranking-golden.mjs", import.meta.url)

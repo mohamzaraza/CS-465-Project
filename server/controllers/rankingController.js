@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { computeChestTier } from "../src/ranking/chestRanking.js";
+import { computeChestTier } from "../src/ranking/index.js";
 import { MS_PER_HOUR, RANK_COOLDOWN_HOURS } from "../config/constants.js";
 
 export async function rankChest(req, res) {

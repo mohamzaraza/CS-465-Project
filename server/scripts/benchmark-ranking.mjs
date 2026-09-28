@@ -1,15 +1,15 @@
-// Times computeChestTier and computeBackTier over the golden-master inputs, to
-// record how fast the engines are BEFORE Enhancement 2 optimises them.
+// Times computeChestTier and computeBackTier over the golden-master inputs, so
+// the same script measures the engines before and after Enhancement 2.
+//
+// Note what is NOT timed: building the engines. That happens once, at import,
+// before the first measurement, which is exactly the point of moving the anchor
+// scoring out of the request path.
 //
 // Plain Node, no dependencies. Run: npm run bench:ranking
 
 import { readFileSync } from "node:fs";
 
-// Anchors before engines; see the comment in generate-ranking-golden.mjs.
-import "../src/ranking/chestTierAnchors.js";
-import "../src/ranking/backTierAnchors.js";
-import { computeChestTier } from "../src/ranking/chestRanking.js";
-import { computeBackTier } from "../src/ranking/backRanking.js";
+import { computeBackTier, computeChestTier } from "../src/ranking/index.js";
 
 const WARMUP_PASSES = 200; // let the JIT settle before anything is recorded
 const TIMED_RUNS = 7; // odd, so the median is a real sample
@@ -56,7 +56,7 @@ const results = [
 ];
 
 console.log("");
-console.log("Ranking engine baseline benchmark");
+console.log("Ranking engine benchmark");
 console.log(`  Node ${process.version} on ${process.platform} ${process.arch}`);
 console.log(
   `  ${WARMUP_PASSES} warm-up passes, then ${TIMED_RUNS} timed runs of ` +
