@@ -227,8 +227,8 @@ function validateConfig(config) {
   if (unreachable.length > 0) {
     throw configError(
       muscle,
-      `tier(s) ${quote(unreachable)} can never be returned: not in the ladder, not the zero ` +
-        "tier, and not the override tier"
+      `tier(s) ${quote(unreachable)} can never be returned: not in the ladder and not the ` +
+        "zero tier"
     );
   }
 

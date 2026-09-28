@@ -312,6 +312,11 @@ describe("createRankingEngine validation", () => {
     expect(() => createRankingEngine(config)).toThrow(/"Mid"/);
   });
 
+  it("does not point at the deleted override rule when a tier is unreachable", () => {
+    const config = testConfig({ ladder: ["Low", "High"] });
+    expect(() => createRankingEngine(config)).not.toThrow(/override/);
+  });
+
   it("throws when a tier in the order is missing from the ladder", () => {
     // "Mid" is still listed as a tier but nothing can ever return it. Before
     // Prompt 3 an override tier was the one legitimate exception to this; now
