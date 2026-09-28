@@ -151,6 +151,7 @@ describe("server/src/ranking has no import cycle", () => {
     expect(Object.keys(graph)).toEqual([
       "formulas.js",
       "index.js",
+      "leaderboard.js",
       "rankingConfig.js",
       "rankingEngine.js",
       "validateLifts.js",
@@ -161,6 +162,9 @@ describe("server/src/ranking has no import cycle", () => {
     expect(graph).toEqual({
       "formulas.js": [],
       "index.js": ["rankingConfig.js", "rankingEngine.js"],
+      // Added in Prompt 4: pure leaderboard helpers, deliberately importing
+      // nothing so Prisma and Express stay out of the ranking directory.
+      "leaderboard.js": [],
       // Pure data: importing nothing is what made the cycle impossible.
       "rankingConfig.js": [],
       "rankingEngine.js": ["formulas.js", "validateLifts.js"],

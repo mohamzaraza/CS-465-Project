@@ -25,7 +25,8 @@ export default function TotalLeaderboard({ data }) {
       {/* Rows */}
       <div className="space-y-2">
         {data.map((row) => (
-          <LeaderboardRow key={row.rank} row={row} />
+          // Tied scores share a rank; the email keeps the key unique.
+          <LeaderboardRow key={`${row.rank}-${row.user}`} row={row} />
         ))}
       </div>
     </div>

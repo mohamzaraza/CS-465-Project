@@ -505,3 +505,161 @@ with a clear message instead of a rank. Nothing breaks - `apiRequest` surfaces t
 `error` string, and the form already shows it in its `role="alert"` - but the
 client's limits and the server's no longer agree. Bringing them into line is a
 client change, and this prompt's scope was the server, so it was not made.
+
+## Data structures (Prompt 4)
+
+Two changes: the leaderboard now gives tied scores the same rank, and a new
+`GET /api/leaderboard/total` sums each user's scores across muscles and picks
+the top 20 with a min-heap. No field the chest leaderboard returns was changed,
+added or removed; `prisma/*` and `server/tests/fixtures/*` are untouched; no
+dependency was added.
+
+### The tie-ranking bug
+
+`getChestLeaderboard` numbered rows `index + 1`, so two lifters with the same
+score got different ranks, and which of them came "first" was whatever order
+the database happened to return equal rows in.
+
+| Score | Before (`index + 1`) | After (`rankWithTies`) |
+|---|---|---|
+| 900 | 1 | 1 |
+| 800 | 2 | **2** |
+| 800 | 3 | **2** |
+| 700 | 4 | 4 |
+
+The fix is "competition ranking" (1, 2, 2, 4): tied scores share a rank and
+the next rank skips, so a rank always means "1 + how many people scored
+higher". A single row is still rank 1, and rows with distinct scores get the
+same ranks as before. `rankWithTies` lives in the pure module
+`server/src/ranking/leaderboard.js` and does not mutate its input.
+
+### A deterministic tie-break for the chest query
+
+The chest query's `orderBy` went from `{ score: "desc" }` to
+`[{ score: "desc" }, { userId: "asc" }]`. It adds no column and touches no
+schema, and it only changes the order of rows that are tied today. Without it,
+lifters tied at the 20th/21st cutoff could swap in and out between requests,
+and the chest and total endpoints would break ties differently. Everything
+else in the query (`where`, `take: 20`, `include: { user: { select: { email } } }`)
+is unchanged. `userId` was chosen over a creation time because `MuscleRank`
+has no `createdAt`, and `User.createdAt` would need an extra joined column.
+
+### Min-heap top-K: what it costs versus sorting everything
+
+`topK(items, k, compare)` keeps the best k seen so far in a size-k binary
+min-heap whose root is the *worst* of them. Each new item costs one comparison
+against the root to reject; only an item that beats the root pays O(log k) to
+replace it. At the end the heap is popped into best-first order.
+
+| | Sort everything, then slice | Min-heap top-K |
+|---|---|---|
+| Time | O(n log n) | O(n log k) |
+| Extra space | O(n) (the sorted copy) | O(k) (the heap) |
+| Comparator calls, n = 10,000, k = 20, seeded random scores | 119,860 | 10,926 |
+
+The heap is array-backed: a complete binary tree packs into contiguous
+storage with children at `2i + 1` and `2i + 2` and the parent at
+`(i - 1) >> 1`, so there are no node objects or pointers. `MinHeap` has
+`push`, `pop`, `peek` and `size`, plus `replaceTop`, which `topK` uses to
+swap out the root in one sift instead of a `pop` then a `push`.
+
+**Ties.** A heap is not stable, so `topK` carries each item's original index
+as the final tie-break. Items the comparator calls equal come out in input
+order, exactly as a stable `sort` followed by `slice(0, k)` returns them. The
+tests compare against stable sort-then-slice on seeded inputs with heavy ties
+(scores 0-9 and 0-49 over 3,000-5,000 items) as well as few ties. On top of
+that, the total leaderboard's comparator itself breaks ties by lower `userId`,
+matching the chest query.
+
+**The complexity claim is tested, not just stated.**
+`tests/leaderboard.test.js` counts comparator calls through a wrapper and
+asserts fewer than `n * (ceil(log2(k)) + 2)` = 70,000 for n = 10,000, k = 20
+(the real count is 10,926). It also asserts that a full sort of the same input
+goes *over* that bound (119,860), so the test would catch an implementation
+that quietly sorted everything.
+
+### Benchmark
+
+```
+cd server
+node scripts/benchmark-topk.mjs
+```
+
+k = 20, seeded random scores (0-99,999) with the total leaderboard's
+comparator (score descending, then id). Node v22.19.0, win32 x64. Five warm-up
+runs, then the median of 9 timed runs, in microseconds per call. The script
+first checks that both methods return identical results.
+
+| n | Run | heap topK (us) | sort + slice (us) | sort / heap |
+|---|---|---|---|---|
+| 1,000 | 1 | 21.2 | 234.1 | 11.0x |
+| 1,000 | 2 | 21.3 | 227.7 | 10.7x |
+| 1,000 | 3 | 20.7 | 229.3 | 11.1x |
+| 10,000 | 1 | 129.2 | 3,215.7 | 24.9x |
+| 10,000 | 2 | 138.6 | 3,237.1 | 23.4x |
+| 10,000 | 3 | 130.1 | 3,230.5 | 24.8x |
+| 100,000 | 1 | 1,159.3 | 49,306.1 | 42.5x |
+| 100,000 | 2 | 1,140.0 | 49,852.2 | 43.7x |
+| 100,000 | 3 | 1,144.3 | 49,826.3 | 43.5x |
+
+**Honest reading.** On this machine the heap won at every size measured,
+including n = 1,000, and the gap grows with n as O(n log n) versus O(n log k)
+predicts. Sort did not win at small n here, but it can on other machines or
+with a cheaper comparator (plain number subtraction instead of a
+score-then-string comparison). The expensive comparator helps the heap,
+because the heap calls it about ten times less often. Micro-benchmark numbers
+vary by machine, Node version and background load; the columns are only
+comparable to each other because they were measured on the same machine in
+the same run. At this app's real size (tens of users) both take microseconds,
+and the request is dominated by the database round-trip.
+
+### Why the total leaderboard sums in a Map first
+
+The heap needs one number per user, but the database returns one row per user
+per muscle. A single pass over the rows adds each score into a `Map` keyed by
+`userId`: O(n) time for n rows, O(u) space for u users. Only then does `topK`
+run over the u totals: O(u log 20). A user who has ranked only some muscles
+simply has fewer rows to add; their total is the sum of the muscles they have.
+Prisma's `groupBy` could sum in the database, but it cannot return the related
+`user.email`, and the response must keep that field for now.
+
+### Where the heap earns its keep, and where it does not
+
+For the existing 20-row chest query, **the database already sorts and limits**
+(`orderBy` plus `take: 20`), so the chest endpoint gains nothing from a heap
+and does not use one; it only uses `rankWithTies`. The heap earns its keep
+only where the app has to aggregate across rows itself, as the total
+leaderboard does, and so must pick the top 20 from values the database never
+sorted.
+
+### Known limits of the total endpoint (deliberately not fixed here)
+
+- **No pagination.** The total query reads every user's rank rows (at most 13
+  per user, three columns each via `select`) on every request. That is fine at
+  this app's size, not at large scale, where a database-side aggregate or a
+  maintained total column would be needed. Pagination and caching were out of
+  scope for this prompt.
+- **Emails are public here too.** `/api/leaderboard/total` returns the `user`
+  (email) field exactly like the chest endpoint. Both endpoints build their rows
+  through one shared function, `toLeaderboardRow` in
+  `server/controllers/leaderboardController.js`, so Enhancement 3 can remove
+  email in that single place.
+- **`tier` is `null` on total rows.** Tiers are per muscle and there is no
+  cross-muscle tier, so none is invented. Both endpoints still return exactly
+  `{ rank, user, tier, score }`. The client's `LeaderboardRow` would show
+  "Unknown" for a null tier, which is harmless while the client does not call
+  `/total`, and it does not.
+
+### Files in this commit
+
+| File | Change |
+|---|---|
+| `server/src/ranking/leaderboard.js` | Added. Pure `rankWithTies`, `MinHeap`, `topK`; no Prisma or Express imports. |
+| `server/controllers/leaderboardController.js` | `LEADERBOARD_LIMIT = 20`; shared `toLeaderboardRow`; chest ranks from `rankWithTies` plus the `userId` tie-break; new `getTotalLeaderboard`. |
+| `server/routes/leaderboardRoutes.js` | `GET /total` added, wrapped in `asyncHandler` like `/chest`. |
+| `server/tests/leaderboard.test.js` | Added. `rankWithTies` cases, `MinHeap` against `Array.sort`, `topK` against stable sort-then-slice, edge cases, comparator-count bound. |
+| `server/tests/leaderboardController.test.js` | Added. Chest query and fields, tie-aware ranks, total sums, limit, order, 500s, shared field shape. |
+| `server/tests/ranking.imports.test.js` | `leaderboard.js` added to the expected import graph, as a leaf. |
+| `server/scripts/benchmark-topk.mjs` | Added. topK versus sort-then-slice at n = 1,000 / 10,000 / 100,000. |
+| `client/src/components/colosseum/TotalLeaderboard.jsx` | React key changed from `row.rank` to `${row.rank}-${row.user}`, since tied rows now share a rank. Approved client change; the only place that keys leaderboard rows (`ColosseumPage.jsx` renders none itself). |
+| `client/src/components/colosseum/TotalLeaderboard.test.jsx` | Added. Two tied rows render with no duplicate-key warning; the test fails on the old key. |
