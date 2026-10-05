@@ -335,17 +335,3 @@ Migration 1 has none. Migration 2, all of it:
   server cannot run on this schema, so rolling the code back also means
   restoring the database. **This is the point of no return.**
 
-## How this was made
-
-The changes on this branch were implemented by Claude Code (Anthropic) from
-prompts I wrote, and I reviewed each commit. Every command that touched a
-database ran against the test database only, after I approved it in that
-session; the schema and both migrations were shown to me as SQL before they
-were created or applied.
-
-Branch: `enhancement-3`. Scope: `server/prisma/*`; the database-facing parts
-of the auth, leaderboard and ranking controllers; a narrow, approved addition
-to `server/src/ranking/` (`tierOf` and `tierForScore`); the exercise catalog
-endpoint; and the client changes that follow from the API contract.
-
-<!-- Edit this section in your own words before submitting. -->
