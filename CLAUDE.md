@@ -1,5 +1,4 @@
-\# LiftLogic: CS 499 Enhancement Two (algorithms and data structures)
-
+\# LiftLogic: CS 499 Enhancement Three (databases)
 
 
 Full-stack fitness app. client/ is React 19 + Vite + Tailwind. server/ is Express 5 + Prisma + PostgreSQL. Both use ES modules. There is NO package.json at the repo root: run every command inside client/ or server/.
@@ -10,15 +9,15 @@ Full-stack fitness app. client/ is React 19 + Vite + Tailwind. server/ is Expres
 
 \- client: npm install, npm run dev (http://localhost:5173/), npm run lint, npm run build, npm test (added in Prompt 1)
 
-\- server: npm install, npm run dev, npm test (vitest + supertest, no database needed)
+\- server: npm install, npm run dev, npm test (vitest + supertest; most tests mock Prisma and need no database, but this enhancement adds some that need the test database named in that session)
 
 
 
 \## Rules
 
-\- Work on the git branch enhancement-2 in small commits. Before each commit run lint, tests and build for what you touched and show me the real output.
+\- Work on the git branch enhancement-3 in small commits. Before each commit run lint, tests and build for what you touched and show me the real output.
 
-\- Never read, print or edit any .env file. Use .env.example files instead. Do not start the real server or connect to a database; none is available. Tests must not need a database or the network.
+\- Never read, print or edit any .env file. Use .env.example files instead. A real test database may be used, but only the one I name as the test database in that session, configured through its own .env, never server/.env or the app's live database. Never run migrations against any database without my explicit go-ahead in that session.
 
 \- Do not change behavior or visual design beyond what the prompt asks. Keep every existing URL working. Preserve existing line endings and do not reformat unrelated code.
 
@@ -34,17 +33,19 @@ Full-stack fitness app. client/ is React 19 + Vite + Tailwind. server/ is Expres
 
 
 
-\## Out of scope (planned for Enhancement 3: do NOT fix or edit)
+\## In scope now (Enhancement 3: databases)
 
-\- prisma/\*, the database schema, migrations, and the leaderboard returning user emails.
+\- server/prisma/\* (schema, migrations, seed data).
 
-\- Moving the exercise catalog (client/src/data/exercises.js) into the database.
+\- server/controllers/leaderboardController.js, authController.js and rankingController.js, but ONLY for database-related changes (queries, fields returned, indexes). Do not touch ranking math or validation logic from Enhancement 2.
+
+\- Moving the exercise catalog (client/src/data/exercises.js, client/src/data/muscleGroups.js) into the database, plus a new server endpoint and client fetch to read it.
+
+\- Client changes stay minimal and only follow a database or API contract change (e.g. the exercise page now fetches instead of importing a static file).
 
 
 
-\## In scope now (Enhancement 2: algorithms and data structures)
+\## Out of scope (do NOT edit)
 
-\- server/src/ranking/\*, controllers/rankingController.js and the ranking route wiring, plus tests for them. This includes the missing computeBackTier import, the circular import between the anchor and ranking files, and the import-time console.log calls.
-
-\- Client changes stay minimal and only follow an API contract change.
+\- server/src/ranking/\* (the scoring formulas, tier logic, validation and leaderboard ranking/heap code). Enhancement 2 finished this; only the queries that READ from or WRITE to the database around it are in scope here.
 
