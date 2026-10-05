@@ -175,6 +175,54 @@ describe("POST /api/auth/register", () => {
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: "connection refused" });
   });
+
+  it("stores a mixed-case email lowercase, so the lowercase CHECK constraint is satisfied", async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+    prisma.user.create.mockResolvedValue({});
+
+    const res = await request(app)
+      .post("/api/auth/register")
+      .send({ email: "Mixed.Case@Example.COM", password: "longenough" });
+
+    expect(res.status).toBe(201);
+    // The duplicate check and the insert both use the lowercase form, so
+    // "A@x.com" finds an existing "a@x.com" and answers 409.
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { email: "mixed.case@example.com" },
+    });
+    expect(prisma.user.create).toHaveBeenCalledWith({
+      data: { email: "mixed.case@example.com", password: expect.any(String) },
+    });
+  });
+
+  it("answers 409 when the same address is registered again in another case", async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: "existing", email: "a@b.co" });
+
+    const res = await request(app)
+      .post("/api/auth/register")
+      .send({ email: "A@B.CO", password: "longenough" });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: "Email already in use" });
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: "a@b.co" } });
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/auth/login", () => {
+  it("looks the account up by the lowercase email, whatever case was typed", async () => {
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post("/api/auth/login")
+      .send({ email: "Mixed.Case@Example.COM", password: "whatever" });
+
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "Invalid credentials" });
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { email: "mixed.case@example.com" },
+    });
+  });
 });
 
 describe("fallbacks", () => {

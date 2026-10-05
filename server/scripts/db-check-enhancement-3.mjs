@@ -8,6 +8,7 @@
 //   pre-m1   before migration 1: would the email CHECK pass, is UserLiftsLog empty
 //   post-m1  after migration 1: did lastRankedAt backfill match lastChestRankAt
 //   pre-m2   before migration 2 (the drops): UserLiftsLog still empty
+//   post-m2  after migration 2: every dropped column, table and enum is gone
 //
 // The connection string is never printed; only the database's own name is, so
 // the output shows which database answered without leaking credentials.
@@ -60,7 +61,42 @@ const CHECKS = {
       sql: `SELECT count(*)::int AS n FROM "UserLiftsLog"`,
     },
   ],
+  // Read from the catalog rather than inferred from the migration having run, so
+  // a partly applied migration shows up as the objects it left behind.
+  "post-m2": [
+    {
+      label: 'column User."lastChestRankAt" still present',
+      sql: columnCount("User", ["lastChestRankAt"]),
+    },
+    {
+      label: 'column MuscleRank."tier" still present',
+      sql: columnCount("MuscleRank", ["tier"]),
+    },
+    {
+      label: 'columns UserLiftsLog."liftName"/"weight"/"reps" still present',
+      sql: columnCount("UserLiftsLog", ["liftName", "weight", "reps"]),
+    },
+    {
+      label: 'table "MuscleMastery" still present',
+      sql: `SELECT count(*)::int AS n FROM information_schema.tables
+            WHERE table_schema = current_schema() AND table_name = 'MuscleMastery'`,
+    },
+    {
+      label: 'enum type "MasteryLevel" still present',
+      sql: `SELECT count(*)::int AS n FROM pg_type t JOIN pg_namespace ns ON ns.oid = t.typnamespace
+            WHERE ns.nspname = current_schema() AND t.typname = 'MasteryLevel'`,
+    },
+  ],
 };
+
+// The names are fixed literals from this file, never input, so inlining them
+// into the SQL is safe.
+function columnCount(table, columns) {
+  const names = columns.map((name) => `'${name}'`).join(", ");
+  return `SELECT count(*)::int AS n FROM information_schema.columns
+          WHERE table_schema = current_schema() AND table_name = '${table}'
+            AND column_name IN (${names})`;
+}
 
 const phase = process.argv[2];
 if (!Object.hasOwn(CHECKS, phase)) {

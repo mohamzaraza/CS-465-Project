@@ -1,42 +1,110 @@
 import { prisma } from "../lib/prisma.js";
-import { rankLifts, validateLifts } from "../src/ranking/index.js";
+import { rankLifts, tierForScore, validateLifts } from "../src/ranking/index.js";
 import { MS_PER_HOUR, RANK_COOLDOWN_HOURS } from "../config/constants.js";
 
-// What each muscle does with a result it has computed. The scoring itself is the
-// same code for every muscle, so this table is the only thing that differed
-// between the old hand-copied chest and back handlers.
-//
-// `saves: null` is not a gap, it is a decision (Prompt 3, approved): the rank
-// cooldown reads User.lastChestRankAt, a chest-only column, and the muscle enum
-// and a per-muscle cooldown column are Enhancement 3's schema work. Rather than
-// make back share chest's cooldown or invent a column, POST /api/rank/back
-// computes and returns the rank WITHOUT saving it and without a cooldown. It
-// used to answer 500 for every request, because the handler called
-// computeBackTier and the module never imported it.
+// What each muscle needs beyond the shared scoring code. Back used to compute a
+// rank without saving it, because the cooldown lived in User.lastChestRankAt, a
+// chest-only column. Enhancement 3 moved the cooldown onto the MuscleRank row
+// itself, so every muscle with a ranking engine now saves and cools down on its
+// own, and ranking one muscle never locks another.
 const MUSCLES = {
   chest: {
-    saves: {
-      muscleEnum: "CHEST",
-      // The User column holding the last time this muscle was ranked.
-      cooldownField: "lastChestRankAt",
-      lockedMessage: "Chest ranking locked. Try again later.",
-    },
+    muscleEnum: "CHEST",
+    lockedMessage: "Chest ranking locked. Try again later.",
     errorLabel: "Chest ranking error:",
     failureMessage: "Failed to rank chest",
   },
   back: {
-    saves: null,
+    muscleEnum: "BACK",
+    lockedMessage: "Back ranking locked. Try again later.",
     errorLabel: "Back ranking error:",
     failureMessage: "Failed to rank back.",
   },
 };
 
-// One handler per muscle, built from the table above. Chest's behavior for valid
-// input is unchanged down to the status codes, the message text and the shape of
-// the response (the saved Prisma row, which the client's LiftRankForm reads
-// .tier and .score from).
+// The response LiftRankForm has always read: the saved row's own fields, with
+// the tier in the uppercase form the dropped tier column used to hold. Fields
+// are picked rather than spread so the new lastRankedAt column does not leak
+// into a contract that never had it.
+function toSavedRank(row, muscle) {
+  return {
+    id: row.id,
+    userId: row.userId,
+    muscle: row.muscle,
+    tier: tierForScore(muscle, row.score),
+    score: row.score,
+    updatedAt: row.updatedAt,
+  };
+}
+
+/**
+ * Save a new score for one muscle if, and only if, its cooldown has run out.
+ * Returns false while the cooldown is still running.
+ *
+ * Enhancement 2 read the timestamp and wrote it back in two separate steps, so
+ * two simultaneous requests could both pass the check. Here the check IS the
+ * write: one conditional UPDATE, which Postgres re-evaluates against the row as
+ * any concurrent request left it, so only one of them can match.
+ */
+async function saveIfCooledDown(userId, muscleEnum, score) {
+  const now = new Date();
+  // A row ranked exactly RANK_COOLDOWN_HOURS ago may rank again, as before.
+  const cutoff = new Date(now.getTime() - RANK_COOLDOWN_HOURS * MS_PER_HOUR);
+
+  const { count } = await prisma.muscleRank.updateMany({
+    where: { userId, muscle: muscleEnum, lastRankedAt: { lte: cutoff } },
+    data: { score, lastRankedAt: now },
+  });
+  if (count === 1) return true;
+
+  // Nothing matched: either this is the user's first rank for this muscle, or
+  // the row exists and is still cooling down. Creating tells the two apart
+  // without a racy read first: the unique (userId, muscle) constraint refuses
+  // the create (P2002) exactly when the row already exists.
+  try {
+    await prisma.muscleRank.create({
+      data: { userId, muscle: muscleEnum, score, lastRankedAt: now },
+    });
+    return true;
+  } catch (err) {
+    if (err?.code === "P2002") return false;
+    throw err;
+  }
+}
+
+/**
+ * The history row for one saved rank attempt, in the shape
+ * prisma.userLiftsLog.create({ data }) takes. `lifts` is validateLifts' output,
+ * so it holds exactly the muscle's configured lifts.
+ *
+ * TODO(Enhancement 3, Prompt 4): not written yet. UserLiftsLog still carries the
+ * old liftName/weight/reps columns as NOT NULL until Migration 2 drops them, so
+ * an insert now would fail. Once they are gone, write this in the same
+ * transaction as saveIfCooledDown, so an attempt is logged if and only if it
+ * was saved.
+ */
+export function rankAttemptLogData(userId, muscleEnum, lifts, score) {
+  return {
+    userId,
+    muscle: muscleEnum,
+    score,
+    // The ranking form has no unit and the engine's anchors are in pounds.
+    weightUnit: "LB",
+    entries: {
+      create: Object.entries(lifts).map(([liftKey, { weight, reps }]) => ({
+        liftKey,
+        weight,
+        reps,
+      })),
+    },
+  };
+}
+
+// One handler per muscle, built from the table above. Status codes and messages
+// are unchanged for chest, and the response is still the saved row with an
+// uppercase tier, which is what the client's LiftRankForm reads.
 function createRankHandler(muscle) {
-  const { saves, errorLabel, failureMessage } = MUSCLES[muscle];
+  const { muscleEnum, lockedMessage, errorLabel, failureMessage } = MUSCLES[muscle];
 
   return async function rankHandler(req, res) {
     try {
@@ -51,48 +119,20 @@ function createRankHandler(muscle) {
         return res.status(400).json({ error: checked.errors.join(" "), errors: checked.errors });
       }
 
-      if (!saves) {
-        return res.json(rankLifts(muscle, checked.lifts));
-      }
-
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-
-      if (user[saves.cooldownField]) {
-        const hoursSince =
-          (Date.now() - new Date(user[saves.cooldownField]).getTime()) / MS_PER_HOUR;
-
-        if (hoursSince < RANK_COOLDOWN_HOURS) {
-          return res.status(403).json({ error: saves.lockedMessage });
-        }
-      }
-
+      // Scoring is pure, so doing it before the save costs nothing if the
+      // cooldown then refuses it, and the save stays a single statement.
       const result = rankLifts(muscle, checked.lifts);
-      const tierEnum = result.tier.toUpperCase();
 
-      // result.score is already the whole number the engine classified the tier
-      // from, so the column and the tier can never disagree.
-      const saved = await prisma.muscleRank.upsert({
-        where: {
-          userId_muscle: { userId, muscle: saves.muscleEnum },
-        },
-        update: {
-          tier: tierEnum,
-          score: result.score,
-        },
-        create: {
-          userId,
-          muscle: saves.muscleEnum,
-          tier: tierEnum,
-          score: result.score,
-        },
+      const saved = await saveIfCooledDown(userId, muscleEnum, result.score);
+      if (!saved) {
+        return res.status(403).json({ error: lockedMessage });
+      }
+
+      const row = await prisma.muscleRank.findUnique({
+        where: { userId_muscle: { userId, muscle: muscleEnum } },
       });
 
-      await prisma.user.update({
-        where: { id: userId },
-        data: { [saves.cooldownField]: new Date() },
-      });
-
-      res.json(saved);
+      res.json(toSavedRank(row, muscle));
     } catch (err) {
       console.error(errorLabel, err);
       res.status(500).json({ error: failureMessage });
@@ -114,6 +154,7 @@ export async function getMyChestRank(req, res) {
           muscle: "CHEST",
         },
       },
+      select: { muscle: true, score: true },
     });
 
     if (!rank) {
@@ -122,7 +163,7 @@ export async function getMyChestRank(req, res) {
 
     return res.json({
       muscle: rank.muscle,
-      tier: rank.tier,
+      tier: tierForScore("chest", rank.score),
       score: rank.score,
     });
   } catch (err) {

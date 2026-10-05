@@ -27,13 +27,6 @@ enum StrengthTier {
   PRIMORDIAL
 }
 
-enum MasteryLevel {
-  UNTRAINED
-  DISCIPLINED
-  FULL_MASTERY
-  ASCENDED
-}
-
 enum MuscleGroup {
   CHEST
   BACK
@@ -83,33 +76,17 @@ model User {
   password  String
   createdAt DateTime @default(now())
 
-  lastChestRankAt DateTime?
-
-  muscleMasteries MuscleMastery[]
   muscleRanks     MuscleRank[]
   liftLogs        UserLiftsLog[]
 }
 
 
-// ==== PER-MUSCLE MASTERY TRACKING ====
-model MuscleMastery {
-  id String @id @default(uuid())
-
-  muscle    MuscleGroup // ENUM — not string
-  mastery   MasteryLevel // ENUM — not string
-  progress  Int          @default(0)
-  updatedAt DateTime     @updatedAt
-
-  // Relation to user
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-}
-
 // ==== PER-MUSCLE RANK (TIER) ====
+// No tier column: the tier is derived from score by tierForScore in
+// src/ranking, so a stored score and its tier can never disagree.
 model MuscleRank {
   id        String        @id @default(uuid())
   muscle    MuscleGroup
-  tier      StrengthTier
   score     Int
   updatedAt DateTime      @updatedAt
 
@@ -135,11 +112,6 @@ model UserLiftsLog {
 
   userId    String
   muscle    MuscleGroup // ENUM
-  // Superseded by UserLiftsLogEntry. Dropped in the next migration, once the
-  // table is confirmed still empty; nothing has ever written them.
-  liftName  String
-  weight    Float
-  reps      Int
   score      Int
   weightUnit WeightUnit @default(LB)
   timestamp DateTime    @default(now())

@@ -10,7 +10,11 @@ export async function register(req, res) {
     return res.status(400).json({ error: problem });
   }
 
-  const { email, password } = req.body;
+  // Stored lowercase so "A@x.com" and "a@x.com" are one account; the database
+  // also enforces this with a CHECK constraint, which would turn a mixed-case
+  // address into a 500 if it ever got this far.
+  const email = req.body.email.toLowerCase();
+  const { password } = req.body;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -44,7 +48,10 @@ export async function login(req, res) {
       return res.status(400).json({ error: problem });
     }
 
-    const { email, password } = req.body;
+    // Matched the way it was stored at registration, so the address can be
+    // typed in any case.
+    const email = req.body.email.toLowerCase();
+    const { password } = req.body;
 
     const user = await prisma.user.findUnique({
       where: { email },
