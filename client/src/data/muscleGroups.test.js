@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { REGIONS, findMuscle, findRegion } from "./muscleGroups";
-import { exercisesByMuscle } from "./exercises";
 
 const allMuscles = REGIONS.flatMap((region) => region.muscles);
 const regionSlugs = REGIONS.map((region) => region.slug);
@@ -11,7 +10,8 @@ describe("muscleGroups", () => {
   });
 
   it("gives every muscle a unique slug", () => {
-    // Slugs must be unique across regions because exercises.js is keyed by slug alone.
+    // Slugs must be unique across regions: each one stands for a single muscle,
+    // and so for a single MuscleGroup value when the page fetches exercises.
     const slugs = allMuscles.map((m) => m.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
   });
@@ -42,10 +42,6 @@ describe("muscleGroups", () => {
         "core/abs", "core/obliques", "core/lowerback",
       ].sort()
     );
-  });
-
-  it("has an exercise list (possibly empty) for exactly the muscles defined", () => {
-    expect(Object.keys(exercisesByMuscle).sort()).toEqual(allMuscles.map((m) => m.slug).sort());
   });
 
   it("looks up regions and muscles, and returns undefined for unknown slugs", () => {

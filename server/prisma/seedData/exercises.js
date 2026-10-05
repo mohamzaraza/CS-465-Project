@@ -1,9 +1,7 @@
-// The exercise catalog the seed writes, copied word for word from
-// client/src/data/exercises.js. It is a copy rather than an import because that
-// file builds video URLs from Vite's import.meta.env when it loads, which plain
-// Node cannot evaluate, and because it is due to be deleted once the client
-// reads the catalog from the API. tests/exerciseSeedData.test.js fails on any
-// difference from the client file while that file still exists.
+// The exercise catalog the seed writes: the source of truth now that the client
+// reads exercises from the API. It was copied word for word from the client's
+// old static file (client/src/data/exercises.js), and a parity test held the
+// two identical until that file was deleted in Enhancement 3.
 //
 // Keyed by the MuscleGroup enum. `video` is the file name only: the client adds
 // its own base path, which differs between dev and the GitHub Pages build.
