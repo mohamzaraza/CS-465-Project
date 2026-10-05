@@ -90,7 +90,7 @@ export async function getMe(req, res) {
       email: req.user.email,
       createdAt: req.user.createdAt,
     });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to fetch user" });
   }
 }

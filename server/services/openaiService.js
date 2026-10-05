@@ -32,6 +32,6 @@ export async function askKevAi(prompt) {
     return response.choices[0].message.content;
   } catch (err) {
     console.error("KevAi OpenAI Error:", err);
-    throw new Error("Failed to contact KevAi.");
+    throw new Error("Failed to contact KevAi.", { cause: err });
   }
 }

@@ -13,5 +13,10 @@ export default defineConfig([
       sourceType: "module",
       globals: globals.node,
     },
+    rules: {
+      // Express middleware is told apart by its parameter count, so some
+      // signatures must keep a parameter they never read; "_" marks those.
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+    },
   },
 ]);
