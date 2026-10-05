@@ -37,6 +37,12 @@ export function rankLifts(muscle, lifts) {
 }
 
 /**
+ * The tier a stored score re-derives, in the uppercase form the database enum
+ * and the client use. Throws for a muscle with no configured engine.
+ */
+export const tierForScore = (muscle, score) => getRankingEngine(muscle).tierOf(score).toUpperCase();
+
+/**
  * Check one muscle's submitted lifts against its configured bounds.
  * Returns { ok: true, lifts } or { ok: false, errors }; never throws for bad
  * input, only for a muscle with no configured engine.

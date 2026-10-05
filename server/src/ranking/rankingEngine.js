@@ -343,6 +343,21 @@ export function createRankingEngine(config) {
   assertStrictlyIncreasing(muscle, thresholds);
   Object.freeze(thresholds);
 
+  // The only copy of the rule that turns a whole-number score into a tier.
+  // rank() and tierOf() both go through it, so a score read back from the
+  // database re-derives exactly the tier rank() gave it when it was saved.
+  function classify(total) {
+    // Kept ahead of everything else, as in the original: a non-positive or NaN
+    // score returns a hard 0, not the computed value. Unreachable through the
+    // API now that every lift must be at least 1 lb for 1 rep, so this is the
+    // answer for a direct engine call only.
+    if (!total || total <= 0) {
+      return { tier: zeroTier, score: 0 };
+    }
+
+    return { tier: findTier(thresholds, total, floorTier), score: total };
+  }
+
   function rank(lifts) {
     // Rounded before anything is decided, so the tier below and the score
     // returned cannot disagree. The database column is an integer, so this
@@ -350,21 +365,15 @@ export function createRankingEngine(config) {
     // after the tier had already been chosen from the unrounded value.
     const total = Math.round(score(lifts));
 
-    // Kept ahead of everything else, as in the original: a non-positive or NaN
-    // score returns a hard 0, not the computed value. Unreachable through the
-    // API now that every lift must be at least 1 lb for 1 rep, so this is the
-    // answer for a direct engine call only.
-    if (!total || total <= 0) {
-      return { muscle, tier: zeroTier, score: 0 };
-    }
-
-    return { muscle, tier: findTier(thresholds, total, floorTier), score: total };
+    return { muscle, ...classify(total) };
   }
 
   return {
     muscle,
     rank,
     score,
+    /** The tier rank() gives a whole-number score, e.g. one stored in the database. */
+    tierOf: (total) => classify(total).tier,
     thresholds,
     /** Check submitted lifts against this muscle's own configured bounds. */
     validate: (lifts) => validateLifts(config, lifts),
