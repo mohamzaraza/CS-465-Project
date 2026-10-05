@@ -38,50 +38,9 @@ function toSavedRank(row, muscle) {
 }
 
 /**
- * Save a new score for one muscle if, and only if, its cooldown has run out.
- * Returns false while the cooldown is still running.
- *
- * Enhancement 2 read the timestamp and wrote it back in two separate steps, so
- * two simultaneous requests could both pass the check. Here the check IS the
- * write: one conditional UPDATE, which Postgres re-evaluates against the row as
- * any concurrent request left it, so only one of them can match.
- */
-async function saveIfCooledDown(userId, muscleEnum, score) {
-  const now = new Date();
-  // A row ranked exactly RANK_COOLDOWN_HOURS ago may rank again, as before.
-  const cutoff = new Date(now.getTime() - RANK_COOLDOWN_HOURS * MS_PER_HOUR);
-
-  const { count } = await prisma.muscleRank.updateMany({
-    where: { userId, muscle: muscleEnum, lastRankedAt: { lte: cutoff } },
-    data: { score, lastRankedAt: now },
-  });
-  if (count === 1) return true;
-
-  // Nothing matched: either this is the user's first rank for this muscle, or
-  // the row exists and is still cooling down. Creating tells the two apart
-  // without a racy read first: the unique (userId, muscle) constraint refuses
-  // the create (P2002) exactly when the row already exists.
-  try {
-    await prisma.muscleRank.create({
-      data: { userId, muscle: muscleEnum, score, lastRankedAt: now },
-    });
-    return true;
-  } catch (err) {
-    if (err?.code === "P2002") return false;
-    throw err;
-  }
-}
-
-/**
  * The history row for one saved rank attempt, in the shape
  * prisma.userLiftsLog.create({ data }) takes. `lifts` is validateLifts' output,
  * so it holds exactly the muscle's configured lifts.
- *
- * TODO(Enhancement 3, Prompt 4): not written yet. UserLiftsLog still carries the
- * old liftName/weight/reps columns as NOT NULL until Migration 2 drops them, so
- * an insert now would fail. Once they are gone, write this in the same
- * transaction as saveIfCooledDown, so an attempt is logged if and only if it
- * was saved.
  */
 export function rankAttemptLogData(userId, muscleEnum, lifts, score) {
   return {
@@ -98,6 +57,54 @@ export function rankAttemptLogData(userId, muscleEnum, lifts, score) {
       })),
     },
   };
+}
+
+/**
+ * Save a new score for one muscle and log the attempt, if and only if the
+ * muscle's cooldown has run out. Returns the saved MuscleRank row, or null
+ * while the cooldown is still running (in which case nothing was written).
+ *
+ * Enhancement 2 read the timestamp and wrote it back in two separate steps, so
+ * two simultaneous requests could both pass the check. Here the check IS the
+ * write: a conditional UPDATE, which Postgres re-evaluates against the row as
+ * any concurrent request left it, so only one of them can match.
+ *
+ * Everything runs in one transaction so an attempt is logged if and only if
+ * its rank was saved. That rules out the earlier create-and-catch-P2002: inside
+ * a Postgres transaction a failed statement poisons every statement after it,
+ * so the history insert could never follow a caught conflict. The insert below
+ * uses ON CONFLICT DO NOTHING instead, which reports a conflict as 0 rows.
+ */
+export async function saveRankAttempt(userId, muscleEnum, lifts, score) {
+  const now = new Date();
+  // A row ranked exactly RANK_COOLDOWN_HOURS ago may rank again, as before.
+  const cutoff = new Date(now.getTime() - RANK_COOLDOWN_HOURS * MS_PER_HOUR);
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.muscleRank.updateMany({
+      where: { userId, muscle: muscleEnum, lastRankedAt: { lte: cutoff } },
+      data: { score, lastRankedAt: now },
+    });
+
+    if (updated.count === 0) {
+      // Nothing matched: either this is the user's first rank for this muscle,
+      // or the row exists and is still cooling down. Inserting tells the two
+      // apart without a racy read first. A concurrent first rank blocks here
+      // until the other transaction commits, then finds the row and skips.
+      const created = await tx.muscleRank.createMany({
+        data: [{ userId, muscle: muscleEnum, score, lastRankedAt: now }],
+        skipDuplicates: true,
+      });
+      // Nothing has been written, so returning commits an empty transaction.
+      if (created.count === 0) return null;
+    }
+
+    await tx.userLiftsLog.create({ data: rankAttemptLogData(userId, muscleEnum, lifts, score) });
+
+    return tx.muscleRank.findUnique({
+      where: { userId_muscle: { userId, muscle: muscleEnum } },
+    });
+  });
 }
 
 // One handler per muscle, built from the table above. Status codes and messages
@@ -120,17 +127,13 @@ function createRankHandler(muscle) {
       }
 
       // Scoring is pure, so doing it before the save costs nothing if the
-      // cooldown then refuses it, and the save stays a single statement.
+      // cooldown then refuses it, and keeps the transaction short.
       const result = rankLifts(muscle, checked.lifts);
 
-      const saved = await saveIfCooledDown(userId, muscleEnum, result.score);
-      if (!saved) {
+      const row = await saveRankAttempt(userId, muscleEnum, checked.lifts, result.score);
+      if (!row) {
         return res.status(403).json({ error: lockedMessage });
       }
-
-      const row = await prisma.muscleRank.findUnique({
-        where: { userId_muscle: { userId, muscle: muscleEnum } },
-      });
 
       res.json(toSavedRank(row, muscle));
     } catch (err) {

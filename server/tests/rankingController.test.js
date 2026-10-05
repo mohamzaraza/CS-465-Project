@@ -6,11 +6,14 @@
 // the response, and the cooldown still answers 403 with the same message.
 // Second, that the Enhancement 3 changes are wired up: the cooldown lives on the
 // MuscleRank row and is spent by one conditional update, the tier is derived
-// from the score, and back now saves with a cooldown of its own.
+// from the score, back saves with a cooldown of its own, and every saved rank
+// is logged to UserLiftsLog in the same transaction.
 //
-// The mock decides whether the conditional update matched; whether Postgres
-// really applies the WHERE clause atomically is a database property, so what is
-// asserted here is the exact condition sent to it.
+// The mock decides what each statement returns; how Postgres really behaves
+// (atomicity, conflicts inside a transaction, rollback) is a database property,
+// pinned against the real test database in tests-db/ranking.db.test.js. What is
+// asserted here is the exact statements sent, and that every write goes through
+// the transaction client rather than the global one.
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
@@ -21,9 +24,19 @@ import { prisma } from "../lib/prisma.js";
 import { rankAttemptLogData } from "../controllers/rankingController.js";
 import { MS_PER_HOUR, RANK_COOLDOWN_HOURS } from "../config/constants.js";
 
+// The client handed to the $transaction callback. Kept separate from `prisma`
+// so a write made outside the transaction would hit the global mock instead,
+// which has no write methods at all, and fail the test.
+const tx = vi.hoisted(() => ({
+  muscleRank: { updateMany: vi.fn(), createMany: vi.fn(), findUnique: vi.fn() },
+  userLiftsLog: { create: vi.fn() },
+}));
+
 vi.mock("../lib/prisma.js", () => ({
   prisma: {
-    muscleRank: { findUnique: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
+    $transaction: vi.fn(),
+    // Only the read GET /api/rank/chest/me makes outside a transaction.
+    muscleRank: { findUnique: vi.fn() },
   },
 }));
 
@@ -48,8 +61,6 @@ const BACK_LIFTS = {
   deadlift: { weight: 225, reps: 5 },
 };
 
-const UNIQUE_VIOLATION = Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
-
 // A realistic MuscleRank row as the database returns it after the save: the
 // real columns, including lastRankedAt, and no tier column.
 function savedRow(muscle, score) {
@@ -63,8 +74,35 @@ function savedRow(muscle, score) {
   };
 }
 
+// The three outcomes of the save. `updateCount` is how many rows the
+// conditional UPDATE matched; `insertCount` how many the insert-if-absent
+// wrote (0 = the row already existed, i.e. the cooldown is running).
+function existingRowCooledDown(muscle, score) {
+  tx.muscleRank.updateMany.mockResolvedValue({ count: 1 });
+  tx.muscleRank.findUnique.mockResolvedValue(savedRow(muscle, score));
+  tx.userLiftsLog.create.mockResolvedValue({});
+}
+function firstRank(muscle, score) {
+  tx.muscleRank.updateMany.mockResolvedValue({ count: 0 });
+  tx.muscleRank.createMany.mockResolvedValue({ count: 1 });
+  tx.muscleRank.findUnique.mockResolvedValue(savedRow(muscle, score));
+  tx.userLiftsLog.create.mockResolvedValue({});
+}
+function cooldownRunning() {
+  tx.muscleRank.updateMany.mockResolvedValue({ count: 0 });
+  // ON CONFLICT DO NOTHING: a conflict is 0 rows written, not an error.
+  tx.muscleRank.createMany.mockResolvedValue({ count: 0 });
+}
+
 function token() {
   return jwt.sign({ id: USER_ID, email: "lifter@example.com" }, process.env.JWT_SECRET);
+}
+
+function expectNoWrites() {
+  expect(tx.muscleRank.updateMany).not.toHaveBeenCalled();
+  expect(tx.muscleRank.createMany).not.toHaveBeenCalled();
+  expect(tx.userLiftsLog.create).not.toHaveBeenCalled();
+  expect(prisma.$transaction).not.toHaveBeenCalled();
 }
 
 let app;
@@ -73,6 +111,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
+  // A transaction that runs the callback with the tx client and passes on
+  // whatever it returns or throws, as Prisma's interactive transaction does.
+  prisma.$transaction.mockImplementation((callback) => callback(tx));
   app = createApp({ clientOrigins: [ALLOWED_ORIGIN] });
   // The controller logs the whole error on a 500; the suite should not.
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -93,8 +134,7 @@ function postBack(lifts, headers = { Authorization: `Bearer ${token()}` }) {
 
 describe("POST /api/rank/chest", () => {
   it("saves and returns the rank, in the shape the client already reads", async () => {
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 1 });
-    prisma.muscleRank.findUnique.mockResolvedValue(savedRow("CHEST", 940));
+    existingRowCooledDown("CHEST", 940);
 
     const res = await postChest(CHEST_LIFTS);
 
@@ -113,14 +153,14 @@ describe("POST /api/rank/chest", () => {
     expect(res.body.tier).toBe("HEROIC");
     expect(res.body.score).toBe(940);
 
-    expect(prisma.muscleRank.findUnique).toHaveBeenCalledWith({
+    // Read back inside the same transaction that wrote it.
+    expect(tx.muscleRank.findUnique).toHaveBeenCalledWith({
       where: { userId_muscle: { userId: USER_ID, muscle: "CHEST" } },
     });
   });
 
   it("spends the cooldown and saves the score in one conditional update", async () => {
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 1 });
-    prisma.muscleRank.findUnique.mockResolvedValue(savedRow("CHEST", 940));
+    existingRowCooledDown("CHEST", 940);
 
     await postChest(CHEST_LIFTS);
 
@@ -128,57 +168,55 @@ describe("POST /api/rank/chest", () => {
     // rounded once, in the engine). No tier is written: the column is derived.
     // The WHERE clause is the cooldown check, so the check and the write cannot
     // be separated by a concurrent request.
-    expect(prisma.muscleRank.updateMany).toHaveBeenCalledTimes(1);
-    expect(prisma.muscleRank.updateMany).toHaveBeenCalledWith({
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.muscleRank.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.muscleRank.updateMany).toHaveBeenCalledWith({
       where: { userId: USER_ID, muscle: "CHEST", lastRankedAt: { lte: COOLDOWN_CUTOFF } },
       data: { score: 940, lastRankedAt: NOW },
     });
-    // An existing row was updated, so there is nothing to create.
-    expect(prisma.muscleRank.create).not.toHaveBeenCalled();
+    // An existing row was updated, so there is nothing to insert.
+    expect(tx.muscleRank.createMany).not.toHaveBeenCalled();
   });
 
   it("allows a re-rank exactly when the cooldown has elapsed, not before", async () => {
     // lte, not lt: a row stamped exactly RANK_COOLDOWN_HOURS ago matches, as the
     // old `hoursSince < RANK_COOLDOWN_HOURS` lock released it.
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 1 });
-    prisma.muscleRank.findUnique.mockResolvedValue(savedRow("CHEST", 940));
+    existingRowCooledDown("CHEST", 940);
 
     const res = await postChest(CHEST_LIFTS);
 
     expect(res.status).toBe(200);
-    const { where } = prisma.muscleRank.updateMany.mock.calls[0][0];
+    const { where } = tx.muscleRank.updateMany.mock.calls[0][0];
     expect(Object.keys(where.lastRankedAt)).toEqual(["lte"]);
     expect(NOW.getTime() - where.lastRankedAt.lte.getTime()).toBe(RANK_COOLDOWN_HOURS * MS_PER_HOUR);
   });
 
-  it("creates the row, with the cooldown stamped, on a user's first chest rank", async () => {
-    // No row matched the update because none exists yet.
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 0 });
-    prisma.muscleRank.create.mockResolvedValue(savedRow("CHEST", 940));
-    prisma.muscleRank.findUnique.mockResolvedValue(savedRow("CHEST", 940));
+  it("inserts the row, with the cooldown stamped, on a user's first chest rank", async () => {
+    firstRank("CHEST", 940);
 
     const res = await postChest(CHEST_LIFTS);
 
     expect(res.status).toBe(200);
     expect(res.body.tier).toBe("HEROIC");
     expect(res.body.score).toBe(940);
-    expect(prisma.muscleRank.create).toHaveBeenCalledWith({
-      data: { userId: USER_ID, muscle: "CHEST", score: 940, lastRankedAt: NOW },
+    expect(tx.muscleRank.createMany).toHaveBeenCalledWith({
+      data: [{ userId: USER_ID, muscle: "CHEST", score: 940, lastRankedAt: NOW }],
+      skipDuplicates: true,
     });
   });
 
   it("answers 403 with the same message while the cooldown is running", async () => {
-    // The row exists (the create hits the unique constraint) but the update did
-    // not match it, so it was ranked inside the cooldown window.
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 0 });
-    prisma.muscleRank.create.mockRejectedValue(UNIQUE_VIOLATION);
+    // The update matched nothing and the insert found the row already there, so
+    // it was ranked inside the cooldown window.
+    cooldownRunning();
 
     const res = await postChest(CHEST_LIFTS);
 
     expect(res.status).toBe(403);
     expect(res.body).toEqual({ error: "Chest ranking locked. Try again later." });
-    // Nothing was saved, so there is no row to read back.
-    expect(prisma.muscleRank.findUnique).not.toHaveBeenCalled();
+    // Nothing was saved, so nothing is logged and there is no row to read back.
+    expect(tx.userLiftsLog.create).not.toHaveBeenCalled();
+    expect(tx.muscleRank.findUnique).not.toHaveBeenCalled();
   });
 
   it("answers 401 without a token and never touches the database", async () => {
@@ -186,13 +224,11 @@ describe("POST /api/rank/chest", () => {
 
     expect(res.status).toBe(401);
     expect(res.body).toEqual({ error: "Missing or malformed authorization header." });
-    expect(prisma.muscleRank.updateMany).not.toHaveBeenCalled();
-    expect(prisma.muscleRank.create).not.toHaveBeenCalled();
-    expect(prisma.muscleRank.findUnique).not.toHaveBeenCalled();
+    expectNoWrites();
   });
 
   it("answers 500 with the existing message when the database fails", async () => {
-    prisma.muscleRank.updateMany.mockRejectedValue(new Error("connection refused"));
+    tx.muscleRank.updateMany.mockRejectedValue(new Error("connection refused"));
 
     const res = await postChest(CHEST_LIFTS);
 
@@ -200,11 +236,11 @@ describe("POST /api/rank/chest", () => {
     expect(res.body).toEqual({ error: "Failed to rank chest" });
   });
 
-  it("answers 500, not 403, when the create fails for any reason but an existing row", async () => {
+  it("answers 500, not 403, when the insert fails for any reason but an existing row", async () => {
     // e.g. a token for a user whose row no longer exists (foreign key, P2003):
-    // only P2002 means "already ranked".
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 0 });
-    prisma.muscleRank.create.mockRejectedValue(
+    // only "0 rows written" means "already ranked".
+    tx.muscleRank.updateMany.mockResolvedValue({ count: 0 });
+    tx.muscleRank.createMany.mockRejectedValue(
       Object.assign(new Error("Foreign key constraint failed"), { code: "P2003" })
     );
 
@@ -212,6 +248,113 @@ describe("POST /api/rank/chest", () => {
 
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: "Failed to rank chest" });
+    expect(tx.userLiftsLog.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("the save's conflict handling inside the transaction", () => {
+  // The fix depends on a conflict being REPORTED (0 rows) rather than THROWN:
+  // inside a Postgres transaction a thrown statement error aborts the whole
+  // transaction, so the old create-and-catch-P2002 could not be followed by the
+  // history insert. The real-database half of this is in
+  // tests-db/ranking.db.test.js; this half pins how the controller reads it.
+  it("treats an insert that writes 0 rows as the cooldown, with no error involved", async () => {
+    cooldownRunning();
+
+    const res = await postChest(CHEST_LIFTS);
+
+    expect(res.status).toBe(403);
+    expect(tx.muscleRank.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skipDuplicates: true })
+    );
+    // The transaction callback resolved (null) instead of rejecting, so the
+    // transaction ends cleanly rather than being torn down by an error.
+    await expect(prisma.$transaction.mock.results[0].value).resolves.toBeNull();
+  });
+
+  it("does not rely on a P2002 from the insert to mean 'already ranked'", async () => {
+    // The old mechanism, replayed: if the insert threw P2002 as create() did,
+    // the request must fail loudly as a 500, not quietly pass as a 403, because
+    // in a real transaction nothing after that error could run.
+    tx.muscleRank.updateMany.mockResolvedValue({ count: 0 });
+    tx.muscleRank.createMany.mockRejectedValue(
+      Object.assign(new Error("Unique constraint failed"), { code: "P2002" })
+    );
+
+    const res = await postChest(CHEST_LIFTS);
+
+    expect(res.status).toBe(500);
+    expect(tx.userLiftsLog.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("rank history (UserLiftsLog)", () => {
+  it.each([
+    ["chest, re-rank after the cooldown", "chest", existingRowCooledDown, "CHEST", CHEST_LIFTS, 940],
+    ["chest, first rank", "chest", firstRank, "CHEST", CHEST_LIFTS, 940],
+    ["back, re-rank after the cooldown", "back", existingRowCooledDown, "BACK", BACK_LIFTS, 2887],
+    ["back, first rank", "back", firstRank, "BACK", BACK_LIFTS, 2887],
+  ])("logs exactly one attempt with its lifts: %s", async (_label, muscle, setUp, muscleEnum, lifts, score) => {
+    setUp(muscleEnum, score);
+
+    const res = await (muscle === "chest" ? postChest(lifts) : postBack(lifts));
+
+    expect(res.status).toBe(200);
+    expect(tx.userLiftsLog.create).toHaveBeenCalledTimes(1);
+    expect(tx.userLiftsLog.create).toHaveBeenCalledWith({
+      data: rankAttemptLogData(USER_ID, muscleEnum, lifts, score),
+    });
+    // One entry per configured lift, nested in the same insert.
+    expect(tx.userLiftsLog.create.mock.calls[0][0].data.entries.create).toHaveLength(3);
+  });
+
+  it("logs nothing while the cooldown is running", async () => {
+    cooldownRunning();
+
+    const res = await postChest(CHEST_LIFTS);
+
+    expect(res.status).toBe(403);
+    expect(tx.userLiftsLog.create).not.toHaveBeenCalled();
+  });
+
+  it("logs nothing for invalid input", async () => {
+    const res = await postChest({ bench: { weight: 135, reps: 8 } });
+
+    expect(res.status).toBe(400);
+    expectNoWrites();
+  });
+
+  it("fails the whole save when the history insert fails, so the transaction rolls back", async () => {
+    existingRowCooledDown("CHEST", 940);
+    tx.userLiftsLog.create.mockRejectedValue(new Error("history insert failed"));
+
+    const res = await postChest(CHEST_LIFTS);
+
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: "Failed to rank chest" });
+    // The rank update and the failed insert were made through the same
+    // transaction client, and the error escaped the transaction callback,
+    // which is what makes Prisma roll the update back. That it really does is
+    // checked against Postgres in tests-db/ranking.db.test.js.
+    expect(tx.muscleRank.updateMany).toHaveBeenCalledTimes(1);
+    await expect(prisma.$transaction.mock.results[0].value).rejects.toThrow("history insert failed");
+    expect(tx.muscleRank.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("builds one history row with one entry per lift, in pounds", () => {
+    expect(rankAttemptLogData(USER_ID, "CHEST", CHEST_LIFTS, 940)).toEqual({
+      userId: USER_ID,
+      muscle: "CHEST",
+      score: 940,
+      weightUnit: "LB",
+      entries: {
+        create: [
+          { liftKey: "bench", weight: 135, reps: 8 },
+          { liftKey: "incline_db", weight: 45, reps: 8 },
+          { liftKey: "cable", weight: 20, reps: 12 },
+        ],
+      },
+    });
   });
 });
 
@@ -241,9 +384,8 @@ describe("POST /api/rank/chest with invalid input", () => {
     expect(res.body.errors.length).toBeGreaterThan(0);
     expect(res.body.error).toBe(res.body.errors.join(" "));
 
-    expect(prisma.muscleRank.updateMany).not.toHaveBeenCalled();
-    expect(prisma.muscleRank.create).not.toHaveBeenCalled();
-    expect(prisma.muscleRank.findUnique).not.toHaveBeenCalled();
+    expectNoWrites();
+    expect(tx.muscleRank.findUnique).not.toHaveBeenCalled();
   });
 
   it("names every problem in the response", async () => {
@@ -259,12 +401,12 @@ describe("POST /api/rank/chest with invalid input", () => {
   });
 
   it("is refused even when the cooldown would have allowed it", async () => {
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 1 });
+    existingRowCooledDown("CHEST", 940);
 
     const res = await postChest({});
 
     expect(res.status).toBe(400);
-    expect(prisma.muscleRank.updateMany).not.toHaveBeenCalled();
+    expectNoWrites();
   });
 });
 
@@ -272,8 +414,7 @@ describe("POST /api/rank/back", () => {
   // Back computed a rank without saving it until Enhancement 3, because the only
   // cooldown column was chest's. It now saves exactly like chest.
   it("saves and returns the rank in the same shape as chest", async () => {
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 1 });
-    prisma.muscleRank.findUnique.mockResolvedValue(savedRow("BACK", 2887));
+    existingRowCooledDown("BACK", 2887);
 
     const res = await postBack(BACK_LIFTS);
 
@@ -286,29 +427,30 @@ describe("POST /api/rank/back", () => {
       score: 2887,
       updatedAt: NOW.toISOString(),
     });
-    expect(prisma.muscleRank.updateMany).toHaveBeenCalledWith({
+    expect(tx.muscleRank.updateMany).toHaveBeenCalledWith({
       where: { userId: USER_ID, muscle: "BACK", lastRankedAt: { lte: COOLDOWN_CUTOFF } },
       data: { score: 2887, lastRankedAt: NOW },
     });
   });
 
   it("uses its own cooldown row, never chest's", async () => {
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 1 });
-    prisma.muscleRank.findUnique.mockResolvedValue(savedRow("BACK", 2887));
+    firstRank("BACK", 2887);
 
     await postBack(BACK_LIFTS);
 
-    for (const [args] of prisma.muscleRank.updateMany.mock.calls) {
+    for (const [args] of tx.muscleRank.updateMany.mock.calls) {
       expect(args.where.muscle).toBe("BACK");
     }
-    expect(prisma.muscleRank.findUnique).toHaveBeenCalledWith({
+    for (const [args] of tx.muscleRank.createMany.mock.calls) {
+      expect(args.data.map((row) => row.muscle)).toEqual(["BACK"]);
+    }
+    expect(tx.muscleRank.findUnique).toHaveBeenCalledWith({
       where: { userId_muscle: { userId: USER_ID, muscle: "BACK" } },
     });
   });
 
   it("answers 403 with its own message while its cooldown is running", async () => {
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 0 });
-    prisma.muscleRank.create.mockRejectedValue(UNIQUE_VIOLATION);
+    cooldownRunning();
 
     const res = await postBack(BACK_LIFTS);
 
@@ -324,7 +466,7 @@ describe("POST /api/rank/back", () => {
       'Missing lift "lat_pulldown". Every lift is required.',
       'Missing lift "db_row". Every lift is required.',
     ]);
-    expect(prisma.muscleRank.updateMany).not.toHaveBeenCalled();
+    expectNoWrites();
   });
 
   it("answers 401 without a token", async () => {
@@ -366,36 +508,5 @@ describe("GET /api/rank/chest/me", () => {
   it("answers 401 without a token", async () => {
     const res = await request(app).get("/api/rank/chest/me");
     expect(res.status).toBe(401);
-  });
-});
-
-describe("rankAttemptLogData (not written yet: Prompt 4)", () => {
-  it("builds one history row with one entry per lift, in pounds", () => {
-    expect(rankAttemptLogData(USER_ID, "CHEST", CHEST_LIFTS, 940)).toEqual({
-      userId: USER_ID,
-      muscle: "CHEST",
-      score: 940,
-      weightUnit: "LB",
-      entries: {
-        create: [
-          { liftKey: "bench", weight: 135, reps: 8 },
-          { liftKey: "incline_db", weight: 45, reps: 8 },
-          { liftKey: "cable", weight: 20, reps: 12 },
-        ],
-      },
-    });
-  });
-
-  it("is not called by any rank handler yet", async () => {
-    // Guards the TODO: nothing may write history until Migration 2 has dropped
-    // the old NOT NULL columns. The mock has no userLiftsLog at all, so any
-    // attempt would throw and turn this 200 into a 500.
-    prisma.muscleRank.updateMany.mockResolvedValue({ count: 1 });
-    prisma.muscleRank.findUnique.mockResolvedValue(savedRow("CHEST", 940));
-
-    const res = await postChest(CHEST_LIFTS);
-
-    expect(res.status).toBe(200);
-    expect(prisma.userLiftsLog).toBeUndefined();
   });
 });
