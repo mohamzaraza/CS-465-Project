@@ -9,6 +9,12 @@
 //   post-m1  after migration 1: did lastRankedAt backfill match lastChestRankAt
 //   pre-m2   before migration 2 (the drops): UserLiftsLog still empty
 //   post-m2  after migration 2: every dropped column, table and enum is gone
+//   final    the hand-written CHECKs and the leaderboard index exist, and no
+//            test run left data behind
+//
+// pre-m1, post-m1 and pre-m2 query columns Migration 2 drops, so on an already
+// migrated database they fail by design; they are kept for the live database,
+// which has not been migrated yet (see ENHANCEMENT_3_CHANGELOG.md).
 //
 // The connection string is never printed; only the database's own name is, so
 // the output shows which database answered without leaking credentials.
@@ -88,6 +94,37 @@ const CHECKS = {
     },
   ],
 };
+
+// What Prisma's drift check cannot see (it ignores CHECK constraints), plus
+// proof that no test run left its rows behind.
+CHECKS.final = [
+  {
+    label: 'CHECK "User_email_lowercase_check" missing',
+    sql: constraintMissing("User", "User_email_lowercase_check"),
+  },
+  {
+    label: 'CHECK "UserLiftsLogEntry_positive_check" missing',
+    sql: constraintMissing("UserLiftsLogEntry", "UserLiftsLogEntry_positive_check"),
+  },
+  {
+    label: 'index "MuscleRank_muscle_score_userId_idx" missing',
+    sql: `SELECT 1 - count(*)::int AS n FROM pg_indexes
+          WHERE schemaname = current_schema() AND indexname = 'MuscleRank_muscle_score_userId_idx'`,
+  },
+  {
+    label: "test users left behind (e3-dbtest-*, e3-explain-*)",
+    sql: `SELECT count(*)::int AS n FROM "User" WHERE "email" LIKE 'e3-dbtest-%' OR "email" LIKE 'e3-explain-%'`,
+  },
+  {
+    label: "fixture exercises left behind (dbtest-*)",
+    sql: `SELECT count(*)::int AS n FROM "Exercise" WHERE "slug" LIKE 'dbtest-%'`,
+  },
+];
+
+function constraintMissing(table, name) {
+  return `SELECT 1 - count(*)::int AS n FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
+          WHERE t.relname = '${table}' AND c.conname = '${name}' AND c.contype = 'c'`;
+}
 
 // The names are fixed literals from this file, never input, so inlining them
 // into the SQL is safe.
