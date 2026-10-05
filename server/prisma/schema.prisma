@@ -50,6 +50,25 @@ enum MuscleGroup {
   LOWER_BACK
 }
 
+// Rank attempts are entered in pounds today (the ranking anchors are in lb),
+// so LB is the default; the column exists so a kg entry is never ambiguous.
+enum WeightUnit {
+  LB
+  KG
+}
+
+// Named "difficulty", not "tier", so it is never confused with StrengthTier.
+enum ExerciseDifficulty {
+  NEWCOMER
+  WARRIOR
+  ELITE
+}
+
+enum ExerciseNoteKind {
+  CUE
+  MISTAKE
+}
+
 // =========================
 // MODELS
 // =========================
@@ -57,6 +76,9 @@ enum MuscleGroup {
 // ==== USERS ====
 model User {
   id        String   @id @default(uuid())
+  // Also CHECK (email = lower(email)), written by hand in the migration because
+  // Prisma cannot express CHECK constraints; it is what makes @unique
+  // case-insensitive.
   email     String   @unique
   password  String
   createdAt DateTime @default(now())
@@ -91,22 +113,94 @@ model MuscleRank {
   score     Int
   updatedAt DateTime      @updatedAt
 
+  // The cooldown, per muscle. Kept apart from updatedAt so a maintenance write
+  // to the row can never reset someone's cooldown.
+  lastRankedAt DateTime @default(now())
+
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
   @@unique([userId, muscle], name: "userId_muscle")
+  // Matches the leaderboard query exactly (filter by muscle, score descending,
+  // userId as the tie-break), so the top rows come off the index unsorted.
+  @@index([muscle, score(sort: Desc), userId])
 }
 
 // ==== LIFT LOGS ====
+// Append-only history: one row per saved rank attempt, its lifts in
+// UserLiftsLogEntry. The tier is deliberately not stored; it is re-derived from
+// score, so a later ladder change re-tiers history too.
 model UserLiftsLog {
   id String @id @default(uuid())
 
   userId    String
   muscle    MuscleGroup // ENUM
+  // Superseded by UserLiftsLogEntry. Dropped in the next migration, once the
+  // table is confirmed still empty; nothing has ever written them.
   liftName  String
   weight    Float
   reps      Int
+  score      Int
+  weightUnit WeightUnit @default(LB)
   timestamp DateTime    @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user    User                @relation(fields: [userId], references: [id])
+  entries UserLiftsLogEntry[]
+
+  @@index([userId, muscle, timestamp(sort: Desc)])
+}
+
+model UserLiftsLogEntry {
+  logId   String
+  // The ranking config's lift key ("bench", "deadlift", ...), not a display name.
+  liftKey String
+  // Also CHECK (weight > 0 AND reps > 0), written by hand in the migration.
+  weight  Float
+  reps    Int
+
+  log UserLiftsLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@id([logId, liftKey])
+}
+
+// ==== EXERCISE CATALOG ====
+// Region, slug and page text stay in client/src/data/muscleGroups.js as routing
+// config; the MuscleGroup enum is the only link between the two, so there is no
+// Muscle table to keep in step with that file.
+model Exercise {
+  id         String             @id @default(uuid())
+  slug       String             @unique
+  muscle     MuscleGroup
+  name       String
+  difficulty ExerciseDifficulty
+  // A filename, not a URL: the client prefixes its own base path, which differs
+  // between dev and the GitHub Pages build.
+  videoFile  String
+  sortOrder  Int
+
+  targets ExerciseTarget[]
+  notes   ExerciseNote[]
+
+  @@unique([muscle, sortOrder])
+}
+
+model ExerciseTarget {
+  exerciseId String
+  position   Int
+  label      String
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@id([exerciseId, position])
+}
+
+model ExerciseNote {
+  exerciseId String
+  kind       ExerciseNoteKind
+  position   Int
+  text       String
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@id([exerciseId, kind, position])
 }
