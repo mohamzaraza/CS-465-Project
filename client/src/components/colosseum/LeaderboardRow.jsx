@@ -16,7 +16,6 @@ export default function LeaderboardRow({ row }) {
     return (
       <div className="flex justify-between px-4 py-2 text-gray-500">
         <span>#{row.rank}</span>
-        <span>{row.user}</span>
         <span>Unknown</span>
         <span>{row.score}</span>
       </div>
@@ -26,10 +25,6 @@ export default function LeaderboardRow({ row }) {
   return (
     <div className={`${LEADERBOARD_GRID} px-4 py-3 rounded-lg`}>
       <span className="text-gray-400">#{row.rank}</span>
-
-      <span className="font-medium truncate">
-        {row.user}
-      </span>
 
       <span className="text-center font-display">
         {tierKey}

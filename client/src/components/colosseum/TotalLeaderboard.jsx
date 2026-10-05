@@ -16,7 +16,6 @@ export default function TotalLeaderboard({ data }) {
       {/* Header */}
       <div className={`${LEADERBOARD_GRID} px-4 py-2 mb-3 text-sm text-gray-400 uppercase tracking-wide`}>
       <span>Rank</span>
-      <span>Warrior</span>
       <span className="text-center">Tier</span>
       <span className="text-right">Score</span>
       <span className="text-right">Stars</span>
@@ -24,9 +23,11 @@ export default function TotalLeaderboard({ data }) {
 
       {/* Rows */}
       <div className="space-y-2">
-        {data.map((row) => (
-          // Tied scores share a rank; the email keeps the key unique.
-          <LeaderboardRow key={`${row.rank}-${row.user}`} row={row} />
+        {data.map((row, index) => (
+          // Tied scores share a rank and rows carry nothing identifying, so the
+          // position keeps the key unique. Safe because the list is replaced
+          // wholesale on each fetch, never reordered or filtered in place.
+          <LeaderboardRow key={`${row.rank}-${index}`} row={row} />
         ))}
       </div>
     </div>

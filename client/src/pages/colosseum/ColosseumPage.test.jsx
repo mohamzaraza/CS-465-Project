@@ -9,9 +9,10 @@ vi.mock("../../lib/api", async (importOriginal) => {
   return { ...actual, apiRequest: vi.fn() };
 });
 
+// The server's row shape since Enhancement 3: no user or email field.
 const ROWS = [
-  { rank: 1, user: "first@example.com", tier: "TITAN", score: 900 },
-  { rank: 2, user: "second@example.com", tier: "RECRUIT", score: 120 },
+  { rank: 1, tier: "TITAN", score: 900 },
+  { rank: 2, tier: "RECRUIT", score: 120 },
 ];
 
 // Each test decides how the leaderboard responds; the embedded rank panel's
@@ -40,8 +41,10 @@ describe("ColosseumPage leaderboard", () => {
     mockLeaderboard(ROWS);
     render(<ColosseumPage />);
 
-    expect(await screen.findByText("first@example.com")).toBeInTheDocument();
-    expect(screen.getByText("second@example.com")).toBeInTheDocument();
+    expect(await screen.findByText("#1")).toBeInTheDocument();
+    expect(screen.getByText("#2")).toBeInTheDocument();
+    expect(screen.getByText("900")).toBeInTheDocument();
+    expect(screen.getByText("120")).toBeInTheDocument();
     expect(screen.getByText("Titan")).toBeInTheDocument();
     expect(screen.getByText("Recruit")).toBeInTheDocument();
     expect(screen.queryByText("Unknown")).not.toBeInTheDocument();
@@ -62,7 +65,8 @@ describe("ColosseumPage leaderboard", () => {
 
     await user.click(screen.getByRole("button", { name: "Retry" }));
 
-    expect(await screen.findByText("first@example.com")).toBeInTheDocument();
+    expect(await screen.findByText("#1")).toBeInTheDocument();
+    expect(screen.getByText("Titan")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
