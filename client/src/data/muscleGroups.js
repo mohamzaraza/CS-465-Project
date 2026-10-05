@@ -5,8 +5,11 @@
 // Slugs are part of public URLs (/workouts/:region/:muscle) and must not change.
 // Titles, descriptions and intros are copied verbatim from the original pages.
 
-function muscle(region, slug, linkLabel, title, description) {
-  return { region, slug, linkLabel, title, description };
+// `muscle` is the server's MuscleGroup enum value. The URL slugs differ from it
+// in places (forearm/FOREARMS, lowerback/LOWER_BACK), and this file already owns
+// every other fact about a muscle, so it owns that mapping too.
+function muscle(region, slug, muscleEnum, linkLabel, title, description) {
+  return { region, slug, muscle: muscleEnum, linkLabel, title, description };
 }
 
 export const REGIONS = [
@@ -23,11 +26,13 @@ export const REGIONS = [
         "chest",
         "CHEST",
         "CHEST",
+        "CHEST",
         "The chest consists of upper, mid, and lower fibers of the pectoralis major. The angle of your press determines the emphasis."
       ),
       muscle(
         "upper",
         "shoulders",
+        "SHOULDERS",
         "SHOULDERS",
         "SHOULDERS",
         "The deltoids consist of anterior, lateral, and posterior heads — each requiring a different movement pattern."
@@ -37,11 +42,13 @@ export const REGIONS = [
         "back",
         "BACK",
         "BACK",
+        "BACK",
         "A complex structure including lats, traps, rhomboids, and spinal erectors — all essential for posture and power."
       ),
       muscle(
         "upper",
         "biceps",
+        "BICEPS",
         "BICEPS",
         "BICEPS",
         "Two heads — long and short — responsible for elbow flexion and forearm supination."
@@ -51,11 +58,13 @@ export const REGIONS = [
         "triceps",
         "TRICEPS",
         "TRICEPS",
+        "TRICEPS",
         "Three heads — long, medial, and lateral — responsible for arm extension and upper arm stability."
       ),
       muscle(
         "upper",
         "forearm",
+        "FOREARMS",
         "FOREARMS",
         "FOREARMS",
         "Wrist flexors, extensors, and grip strength muscles. Critical for lifting longevity and performance."
@@ -75,12 +84,14 @@ export const REGIONS = [
         "lower",
         "quads",
         "QUADS",
+        "QUADS",
         "QUADRICEPS",
         "Vastus lateralis, medialis, intermedius, and rectus femoris — responsible for knee extension and sprint power."
       ),
       muscle(
         "lower",
         "hamstrings",
+        "HAMSTRINGS",
         "HAMSTRINGS",
         "HAMSTRINGS",
         "A posterior chain powerhouse group involved in hip extension and knee flexion."
@@ -90,11 +101,13 @@ export const REGIONS = [
         "glutes",
         "GLUTES",
         "GLUTES",
+        "GLUTES",
         "Gluteus maximus, medius, and minimus — vital for hip drive, stability, and explosive strength."
       ),
       muscle(
         "lower",
         "calves",
+        "CALVES",
         "CALVES",
         "CALVES",
         "Gastrocnemius and soleus — essential for ankle stability, jumping power, and lower body symmetry."
@@ -113,6 +126,7 @@ export const REGIONS = [
         "abs",
         "ABS",
         "ABS",
+        "ABS",
         "Rectus abdominis, serratus anterior, and deep core stabilizers — fundamental for posture and bracing."
       ),
       muscle(
@@ -120,11 +134,13 @@ export const REGIONS = [
         "obliques",
         "OBLIQUES",
         "OBLIQUES",
+        "OBLIQUES",
         "Internal and external obliques — controlling rotation, lateral flexion, and anti-rotation stability."
       ),
       muscle(
         "core",
         "lowerback",
+        "LOWER_BACK",
         "LOWER BACK",
         "LOWER BACK",
         "Erector spinae and lumbar stabilizers — the foundation of safe, powerful lifting technique."
