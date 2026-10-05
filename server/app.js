@@ -5,6 +5,7 @@ import { createAiRoutes } from "./routes/aiRoutes.js";
 import rankingRoutes from "./routes/rankingRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import leaderboardRoutes from "./routes/leaderboardRoutes.js";
+import exerciseRoutes from "./routes/exerciseRoutes.js";
 import { errorHandler, httpError, notFound } from "./utils/errorHandler.js";
 
 // Kept separate from server.js so tests can drive the app with supertest
@@ -35,6 +36,9 @@ export function createApp({ clientOrigins }) {
 
   //LEADERBOARD
   app.use("/api/leaderboard", leaderboardRoutes);
+
+  //EXERCISE CATALOG
+  app.use("/api/exercises", exerciseRoutes);
 
   // Default test route
   app.get("/", (req, res) => {

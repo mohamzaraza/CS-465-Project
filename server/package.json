@@ -11,7 +11,9 @@
     "lint": "eslint .",
     "ranking:golden": "node scripts/generate-ranking-golden.mjs",
     "ranking:check": "node scripts/check-ranking-golden.mjs",
-    "bench:ranking": "node scripts/benchmark-ranking.mjs"
+    "bench:ranking": "node scripts/benchmark-ranking.mjs",
+    "db:seed": "node --env-file=.env.test prisma/seed.js",
+    "test:db": "node --env-file=.env.test node_modules/vitest/vitest.mjs run --config vitest.db.config.js"
   },
   "keywords": [],
   "author": "",
